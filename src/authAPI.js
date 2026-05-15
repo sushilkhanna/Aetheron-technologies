@@ -49,8 +49,12 @@ const publicApi = axios.create({
 
 const authAPI = {
   // Registration (sends OTP; OTP verification completes account creation)
-  register: async (userData) => {
-    const res = await publicApi.post('/auth/register', userData);
+  // Registration with name + phone only (password auto-generated for backend compatibility)
+  register: async ({ fullName, phone }) => {
+    // Backend requires a password field — auto-generate a secure random one
+    // since the user authenticates via OTP only
+    const autoPassword = 'Auto@' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    const res = await publicApi.post('/auth/register', { fullName, phone, password: autoPassword });
     return res.data;
   },
 
@@ -60,17 +64,7 @@ const authAPI = {
     return res.data;
   },
 
-  // Login with phone + password
-  login: async ({ phone, password }) => {
-    const requestData = { phone: String(phone), password: String(password) };
-    
-    try {
-      const res = await publicApi.post('/auth/login/password', requestData);
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
-  },
+  // Password login removed — OTP-only login now
 
   // Login with phone + OTP
   loginSendOtp: async (phone) => {
@@ -154,15 +148,7 @@ const authAPI = {
     }
   },
 
-  // Change password
-  changePassword: async (passwordData) => {
-    try {
-      const res = await api.post('/auth/change-password', passwordData);
-      return res.data;
-    } catch (err) {
-      throw err;
-    }
-  },
+
 
   // DigiLocker APIs
   initiateDigiLocker: async () => {
@@ -192,7 +178,6 @@ const authAPI = {
     } catch (error) {
       // Fallback to profile endpoint if dedicated endpoint doesn't exist
       try {
-        console.log('KYC status endpoint not found, using profile endpoint as fallback');
         const profileRes = await api.get('/users/profile');
         return {
           success: true,

@@ -19,7 +19,14 @@ const AdminLayout = ({ children }) => {
       return;
     }
     
-    setAdminUser(JSON.parse(adminData));
+    try {
+      setAdminUser(JSON.parse(adminData));
+    } catch (e) {
+      // Corrupted data — clear and redirect
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
+      navigate('/');
+    }
   }, [navigate]);
 
   const handleLogout = () => {

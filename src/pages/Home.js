@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { User, Shield, ArrowRight, Star, CheckCircle, AlertCircle } from 'lucide-react';
 import PropTypes from 'prop-types';
 import authAPI from '../authAPI';
-import ProfileSection from '../components/ProfileSection';
 
 const heroBgs = [
   'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&h=1080&fit=crop',
@@ -16,7 +15,6 @@ const Home = ({ user, onSignupClick, onProfileUpdate }) => {
   const navigate = useNavigate();
   const [bgIndex, setBgIndex] = useState(0);
   const [stats, setStats] = useState({ totalUsers: '6.2K+', verifiedUsers: '2.1K+', activeUsers: '1.8K+' });
-  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setBgIndex(i => (i + 1) % heroBgs.length), 4000);
@@ -46,15 +44,6 @@ const Home = ({ user, onSignupClick, onProfileUpdate }) => {
       <FeaturesSection />
       <HowItWorks />
       <CTASection user={user} navigate={navigate} onSignupClick={onSignupClick} />
-      
-      {/* Profile Section */}
-      {showProfile && user && (
-        <ProfileSection
-          user={user}
-          onUpdateProfile={handleProfileUpdate}
-          onClose={() => setShowProfile(false)}
-        />
-      )}
     </div>
   );
 };
@@ -286,22 +275,13 @@ const CTASection = ({ user, navigate, onSignupClick }) => (
             </button>
           </>
         ) : (
-          <div className="flex flex-col items-center gap-4">
-            <button 
-              onClick={onSignupClick}
-              className="btn-primary px-8 py-4 flex items-center justify-center gap-2 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              <User size={20} />
-              <span>Sign Up Free</span>
-            </button>
-            <button 
-              onClick={() => navigate('/')}
-              className="btn-outline px-6 py-2 flex items-center justify-center gap-2 text-sm"
-            >
-              <Shield size={16} />
-              <span>Admin Login</span>
-            </button>
-          </div>
+          <button 
+            onClick={onSignupClick}
+            className="btn-primary px-8 py-4 flex items-center justify-center gap-2 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <User size={20} />
+            <span>Sign Up Free</span>
+          </button>
         )}
       </div>
       

@@ -155,14 +155,8 @@ const MyProfile = ({ user, onUpdateUser }) => {
               className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-medium hover:from-orange-600 hover:to-orange-700 transition-all flex items-center justify-center gap-2"
             >
               <Shield size={20} />
-              <span>Admin Login</span>
+              <span>Go to Login</span>
             </button>
-            
-            <div className="text-center">
-              <p className="text-xs text-gray-400 mb-2">Demo Admin Credentials:</p>
-              <p className="text-xs text-gray-500">Phone: 9999999999</p>
-              <p className="text-xs text-gray-500">Password: Admin@123</p>
-            </div>
             
             <button 
               onClick={() => navigate('/')}

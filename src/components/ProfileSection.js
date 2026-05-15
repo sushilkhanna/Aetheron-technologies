@@ -63,7 +63,7 @@ const ProfileSection = ({ user, onUpdateProfile, onClose }) => {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'multipart/form-data'
+              // Do NOT set Content-Type for FormData — browser sets it with boundary automatically
             },
             body: formData
           });
@@ -88,8 +88,6 @@ const ProfileSection = ({ user, onUpdateProfile, onClose }) => {
               setSuccessMessage('');
             }, 2000);
           } else {
-            const errorText = await uploadResponse.text();
-            
             // Backend endpoint doesn't exist - use fallback
             const updatedUser = {
               ...user,
@@ -187,7 +185,6 @@ const ProfileSection = ({ user, onUpdateProfile, onClose }) => {
               {!isEditing && (
                 <button
                   onClick={() => {
-                    console.log('Camera button clicked');
                     setIsEditing(true);
                   }}
                   className="absolute bottom-0 right-0 w-10 h-10 bg-orange-DEFAULT rounded-full flex items-center justify-center text-white hover:bg-orange-600 transition-colors shadow-lg border-2 border-white"
@@ -204,7 +201,6 @@ const ProfileSection = ({ user, onUpdateProfile, onClose }) => {
               {!isEditing && (
                 <button
                   onClick={() => {
-                    console.log('Edit button clicked');
                     setIsEditing(true);
                   }}
                   className="mt-3 px-4 py-2 bg-orange-DEFAULT text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 mx-auto"

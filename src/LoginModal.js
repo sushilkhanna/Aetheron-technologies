@@ -1,34 +1,30 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Mail, Lock, Eye, EyeOff, User, AlertCircle, X, Zap, Loader, Shield } from 'lucide-react';
+import { X, Zap, Loader, Shield, Phone } from 'lucide-react';
 import authAPI from './authAPI';
 
 const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
-  const [form, setForm] = useState({ phone: '', password: '' });
+  const [form, setForm] = useState({ phone: '' });
   const [loading, setLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
-  const [loginMethod, setLoginMethod] = useState('password');
   const [otpSent, setOtpSent] = useState(false);
 
-  const OTP_LENGTH = 6;
+  const OTP_LENGTH = 4;
   const [otp, setOtp] = useState(Array.from({ length: OTP_LENGTH }, () => ''));
-  const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
+  const otpRefs = [useRef(), useRef(), useRef(), useRef()];
 
   const cleanPhone = (phone) => {
     return phone.replace(/\D/g, '').slice(-10);
   };
 
   const resetModal = useCallback(() => {
-    setForm({ phone: '', password: '' });
+    setForm({ phone: '' });
     setOtp(Array.from({ length: OTP_LENGTH }, () => ''));
     setOtpSent(false);
-    setLoginMethod('password');
     setError('');
     setSuccess('');
-    setShowPassword(false);
     setLoading(false);
     setOtpLoading(false);
     onClose();
@@ -129,7 +125,7 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
         setError('Failed to send OTP');
       }
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Backend validation failed');
+      setError(err?.response?.data?.message || err?.message || 'Failed to send OTP. Make sure your phone is registered.');
     } finally {
       setOtpLoading(false);
     }
@@ -148,7 +144,7 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
       return;
     }
 
-    if (otpStr.length !== 6) {
+    if (otpStr.length !== OTP_LENGTH) {
       setError('Enter complete OTP');
       return;
     }
@@ -185,78 +181,6 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
       setError(resp?.message || 'Invalid OTP');
     } catch (err) {
       setError(err?.response?.data?.message || 'Validation failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ---------------- PASSWORD LOGIN ----------------
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const phone = cleanPhone(form.phone);
-
-    if (phone.length !== 10 || !form.password) {
-      setError('Fill all fields correctly');
-      return;
-    }
-
-    // DEMO ADMIN MODE - Frontend only (for testing)
-    if (phone === '9999999999' && form.password === 'Admin@123') {
-      const demoAdminData = {
-        id: 999,
-        fullName: 'Demo Admin',
-        email: 'admin@bikepooling.com',
-        phone: '9999999999',
-        role: 'ADMIN',
-        token: 'demo-admin-token-' + Date.now()
-      };
-
-      localStorage.setItem('token', demoAdminData.token);
-      localStorage.setItem('adminToken', demoAdminData.token);
-      localStorage.setItem('user', JSON.stringify(demoAdminData));
-      localStorage.setItem('adminUser', JSON.stringify(demoAdminData));
-
-      setSuccess('Demo Admin login successful!');
-      setTimeout(() => {
-        window.location.href = '/admin/dashboard';
-      }, 1000);
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const resp = await authAPI.login({
-        phone,
-        password: form.password,
-      });
-
-      if (resp?.success && resp?.data?.token) {
-        const authData = resp.data;
-
-        localStorage.setItem('token', authData.token);
-        localStorage.setItem('user', JSON.stringify(authData));
-
-        // Check if user is admin and redirect accordingly
-        if (authData.role === 'ADMIN') {
-          localStorage.setItem('adminToken', authData.token);
-          localStorage.setItem('adminUser', JSON.stringify(authData));
-          setSuccess('Admin login successful!');
-          setTimeout(() => {
-            window.location.href = '/admin/dashboard';
-          }, 1000);
-          return;
-        }
-
-        setSuccess('Login successful!');
-        setTimeout(() => onSuccess(authData), 1000);
-        return;
-      }
-
-      setError(resp?.message || 'Login failed');
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -315,34 +239,6 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
 
         {/* Body */}
         <div className="p-6 sm:p-8">
-          {/* Login Method Tabs */}
-          {!otpSent && (
-            <div className="flex gap-2 p-1 bg-gray-800 rounded-lg mb-6">
-              <button
-                type="button"
-                onClick={() => setLoginMethod('password')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  loginMethod === 'password'
-                    ? 'bg-orange-500 text-white shadow-lg'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-              >
-                Password
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginMethod('otp')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  loginMethod === 'otp'
-                    ? 'bg-orange-500 text-white shadow-lg'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-              >
-                OTP
-              </button>
-            </div>
-          )}
-
           {/* Alerts */}
           {error && (
             <div className="mb-4 p-3 rounded-lg text-sm text-red-300 bg-red-900/20 border border-red-800/50">
@@ -355,7 +251,7 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
             </div>
           )}
 
-          {/* ---------------- OTP SCREEN ---------------- */}
+          {/* ---------------- OTP VERIFICATION SCREEN ---------------- */}
           {otpSent ? (
             <form onSubmit={handleVerifyOtp} className="space-y-6">
               <div>
@@ -368,7 +264,7 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-4 text-center">Enter 6-Digit OTP</label>
+                <label className="block text-sm font-medium text-gray-400 mb-4 text-center">Enter 4-Digit OTP</label>
                 <div className="flex gap-2 sm:gap-3 justify-center">
                   {otp.map((d, i) => (
                     <input
@@ -407,66 +303,35 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
 
           ) : (
 
-            /* ---------------- LOGIN SCREEN ---------------- */
-            <form onSubmit={handleSubmit} className="space-y-6">
+            /* ---------------- PHONE INPUT + SEND OTP SCREEN ---------------- */
+            <form onSubmit={(e) => { e.preventDefault(); handleSendOtp(); }} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-2">Phone Number</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  placeholder="Enter 10-digit phone number"
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
-                  required
-                />
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Phone size={18} />
+                  </div>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    placeholder="Enter 10-digit phone number"
+                    maxLength={10}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
+                    required
+                  />
+                </div>
               </div>
 
-              {loginMethod === 'password' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      name="password"
-                      value={form.password}
-                      onChange={handleChange}
-                      placeholder="Enter your password"
-                      className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all pr-12"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              {loginMethod === 'password' ? (
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-medium hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                >
-                  {loading && <Loader size={16} className="animate-spin" />}
-                  {loading ? 'Signing in...' : 'Login'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSendOtp}
-                  disabled={otpLoading}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-medium hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                >
-                  {otpLoading && <Loader size={16} className="animate-spin" />}
-                  {otpLoading ? 'Sending...' : 'Send OTP'}
-                </button>
-              )}
+              <button
+                type="submit"
+                disabled={otpLoading}
+                className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-medium hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              >
+                {otpLoading && <Loader size={16} className="animate-spin" />}
+                {otpLoading ? 'Sending OTP...' : 'Send OTP'}
+              </button>
             </form>
           )}
 
@@ -483,7 +348,7 @@ const LoginModal = ({ onClose, onSuccess, onSwitchToSignup }) => {
             </p>
             <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
               <Shield size={12} />
-              <span>Admin Access: Use Phone 9999999999, Password Admin@123</span>
+              <span>Secured with OTP verification</span>
             </div>
           </div>
         </div>

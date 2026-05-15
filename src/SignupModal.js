@@ -1,27 +1,26 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Loader, Eye, EyeOff, CheckCircle, Zap, Phone } from 'lucide-react';
+import { X, Loader, CheckCircle, Zap, Phone } from 'lucide-react';
 import authAPI from './authAPI';
 
 const SignupModal = ({ onClose, onSuccess, onSwitchToLogin }) => {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '' });
-  // Backend examples return 6-digit OTPs
-  const OTP_LENGTH = 6;
+  const [form, setForm] = useState({ fullName: '', phone: '' });
+  // Backend returns 4-digit OTPs
+  const OTP_LENGTH = 4;
   const [otp, setOtp] = useState(Array.from({ length: OTP_LENGTH }, () => ''));
   const [loading, setLoading] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   // Explicit refs to keep hook order stable across renders.
-  const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
+  const otpRefs = [useRef(), useRef(), useRef(), useRef()];
   const cleanPhone = (phone) => {
     return phone.replace(/\D/g, '').slice(-10);
   };
 
   const resetModal = useCallback(() => {
     setStep(1);
-    setForm({ fullName: '', email: '', phone: '', password: '' });
+    setForm({ fullName: '', phone: '' });
     setOtp(Array.from({ length: OTP_LENGTH }, () => ''));
     setLoading(false);
     setOtpLoading(false);
@@ -51,7 +50,26 @@ const SignupModal = ({ onClose, onSuccess, onSwitchToLogin }) => {
     return () => document.removeEventListener('keydown', handleEscKey);
   }, [resetModal]);
 
-  const handleChange = (e) => { setForm({ ...form, [e.target.name]: e.target.value }); setError(''); setSuccess(''); };
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    // Phone input validation - only allow digits
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '');
+      if (value !== digitsOnly && value.length > 0) {
+        setError('Phone number can only contain digits (0-9)');
+        setTimeout(() => setError(''), 2000);
+      } else {
+        setError('');
+      }
+      setForm({ ...form, [name]: digitsOnly });
+    } else {
+      setForm({ ...form, [name]: value });
+      setError('');
+    }
+
+    setSuccess('');
+  };
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
@@ -69,24 +87,22 @@ const SignupModal = ({ onClose, onSuccess, onSwitchToLogin }) => {
   
   const handleRegister = async (e) => {
     e.preventDefault();
-    const { fullName, email, phone, password } = form;
-    if (!fullName || !email || !phone || !password) { setError('Please fill in all fields.'); return; }
+    const { fullName, phone } = form;
+    if (!fullName || !phone) { setError('Please fill in all fields.'); return; }
     const cleanedPhone = cleanPhone(phone);
-    // Backend examples use 10-digit phone numbers (without '+'), but accept 10-15 digits with optional '+'
     if (cleanedPhone.length !== 10) { setError('Phone must be valid 10-digit number.'); return; }
     setLoading(true);
     try {
-      const resp = await authAPI.register({ fullName, email, phone: cleanedPhone, password });
-            if (!resp?.success) {
+      const resp = await authAPI.register({ fullName, phone: cleanedPhone });
+      if (!resp?.success) {
         setError(resp?.message || 'Registration failed. Try again.');
         setLoading(false);
         return;
       }
 
       // Step 2: registration OTP verification
-      setSuccess('Registration successful! OTP sent to your phone.');
+      setSuccess('OTP sent to your phone.');
       setOtpLoading(true);
-      // register endpoint already sends OTP per backend contract
       setStep(2);
       setTimeout(() => otpRefs[0].current?.focus(), 100);
     } catch (err) {
@@ -95,15 +111,14 @@ const SignupModal = ({ onClose, onSuccess, onSwitchToLogin }) => {
   };
 
   const handleResendOTP = async () => {
-    // Backend doesn't provide a dedicated "resend registration OTP" endpoint in the contract you shared,
-    // but we can safely call register again to trigger another OTP.
     setError('');
     setOtpLoading(true);
     try {
-      const { fullName, email, phone, password } = form;
+      const { fullName, phone } = form;
       const cleanedPhone = cleanPhone(phone);
-      await authAPI.register({ fullName, email, phone: cleanedPhone, password });
+      await authAPI.register({ fullName, phone: cleanedPhone });
       setOtp(Array.from({ length: OTP_LENGTH }, () => ''));
+      setSuccess('OTP resent successfully!');
       setTimeout(() => otpRefs[0].current?.focus(), 50);
     } catch (e) {
       setError('Failed to resend OTP.');
@@ -132,8 +147,8 @@ const SignupModal = ({ onClose, onSuccess, onSwitchToLogin }) => {
         email: authData.email,
         phone: authData.phone,
         role: authData.role,
-        kycStatus: authData.kycStatus,
-        verified: (authData.kycStatus || '').toUpperCase() === 'APPROVED' || (authData.kycStatus || '').toUpperCase() === 'VERIFIED',
+        dlVerified: authData.dlVerified,
+        phoneVerified: authData.phoneVerified,
       }));
       setStep(3);
       setTimeout(() => onSuccess(authData), 800);
@@ -204,7 +219,7 @@ const SignupModal = ({ onClose, onSuccess, onSwitchToLogin }) => {
             <X size={20} />
           </button>
 
-          {/* Step 1 */}
+          {/* Step 1 — Name + Phone */}
           {step === 1 && (
             <>
               <div className="flex items-center gap-2 mb-4">
@@ -231,33 +246,21 @@ const SignupModal = ({ onClose, onSuccess, onSwitchToLogin }) => {
 
               
               <form onSubmit={handleRegister} className="space-y-3">
-                {[
-                  { label: 'Full Name', name: 'fullName', type: 'text', placeholder: 'John Doe' },
-                  { label: 'Email', name: 'email', type: 'email', placeholder: 'you@example.com' },
-                  { label: 'Phone', name: 'phone', type: 'tel', placeholder: '1234567890' },
-                ].map(({ label, name, type, placeholder }) => (
-                  <div key={name}>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">{label}</label>
-                    <input type={type} name={name} value={form[name]} onChange={handleChange}
-                      placeholder={placeholder} className="input-dark w-full px-4 py-3 rounded-xl text-sm" required />
-                  </div>
-                ))}
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Password</label>
-                  <div className="relative">
-                    <input type={showPassword ? 'text' : 'password'} name="password" value={form.password}
-                      onChange={handleChange} placeholder="Min 8 chars, 1 uppercase, 1 number"
-                      className="input-dark w-full px-4 py-3 rounded-xl text-sm pr-11" required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Full Name</label>
+                  <input type="text" name="fullName" value={form.fullName} onChange={handleChange}
+                    placeholder="John Doe" className="input-dark w-full px-4 py-3 rounded-xl text-sm" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wide">Phone</label>
+                  <input type="tel" name="phone" value={form.phone} onChange={handleChange}
+                    placeholder="Enter 10-digit phone number" maxLength={10}
+                    className="input-dark w-full px-4 py-3 rounded-xl text-sm" required />
                 </div>
                 <button type="submit" disabled={loading}
                   className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-50 flex items-center justify-center gap-2">
                   {loading && <Loader size={15} className="animate-spin" />}
-                  <span>{loading ? (otpLoading ? 'Sending OTP...' : 'Creating account...') : 'Create Account & Get OTP'}</span>
+                  <span>{loading ? 'Sending OTP...' : 'Get OTP'}</span>
                 </button>
               </form>
 

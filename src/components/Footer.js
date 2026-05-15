@@ -33,7 +33,7 @@ const Footer = () => (
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Platform</p>
           <div className="space-y-2.5">
-            {[['Browse Rides', '/browse'], ['Post a Ride', '/post-ride'], ['Dashboard', '/dashboard']].map(([label, to]) => (
+            {[['Home', '/'], ['My Profile', '/profile']].map(([label, to]) => (
               <Link key={to} to={to} className="block text-gray-400 hover:text-white text-sm transition-colors">{label}</Link>
             ))}
           </div>
