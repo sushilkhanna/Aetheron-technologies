@@ -23,6 +23,7 @@ public class AuthService {
     private final JwtUtil             jwtUtil;
     private final OtpService          otpService;
     private final StringRedisTemplate redisTemplate;
+    private final AdminMetricsService metricsService;
 
     @Value("${jwt.expiry.ms}")
     private long jwtExpiryMs;
@@ -65,31 +66,17 @@ public class AuthService {
         User user = User.builder()
                 .fullName(fullName)
                 .phone(req.phone)
-                .role(Role.USER)
+                .role(Role.GUEST)
                 .active(true)
                 .phoneVerified(true)
                 .build();
 
         userRepository.save(user);
         redisTemplate.delete(key);
-
+        metricsService.onUserRegistered();
         log.info("User registered via OTP: {}", req.phone);
         return buildAuthResponse(user);
     }
-
-//    public AuthResponse loginWithPassword(LoginWithPasswordRequest req) {
-//        User user = userRepository.findByPhone(req.phone)
-//                .orElseThrow(() -> new RuntimeException(
-//                        "No account found with this phone number."));
-//
-//        checkAccountActive(user);
-//
-//        if (!passwordEncoder.matches(req.password, user.getPasswordHash())) {
-//            throw new RuntimeException("Incorrect password.");
-//        }
-//
-//        return buildAuthResponse(user);
-//    }
 
     public void sendLoginOtp(SendOtpRequest req) {
         User user = userRepository.findByPhone(req.phone)
@@ -116,21 +103,42 @@ public class AuthService {
         return buildAuthResponse(user);
     }
 
-//    public void changePassword(Long userId, ChangePasswordRequest req) {
-//
-//        User user = userRepository.findById(userId)
-//                .orElseThrow(() -> new RuntimeException("User not found."));
-//
-//        checkAccountActive(user);
-//
-//        user.setPasswordHash(passwordEncoder.encode(req.newPassword));
-//        userRepository.save(user);
-//
-//        String blacklistKey = "blacklist:user:" + userId;
-//        redisTemplate.opsForValue().set(blacklistKey, "true", Duration.ofMillis(jwtExpiryMs));
-//
-//        log.info("Password changed for userId: {}", userId);
-//    }
+    public void sendAdminLoginOtp(SendOtpRequest req) {
+        User user = userRepository.findByPhone(req.phone)
+                .orElseThrow(() -> new RuntimeException(
+                        "No account found with this phone number."));
+
+        // Reject non-admins BEFORE sending the OTP
+        if (user.getRole() != Role.ADMIN) {
+            log.warn("Admin OTP requested for non-admin phone: {}", req.phone);
+            throw new RuntimeException("No account found with this phone number.");
+        }
+
+        checkAccountActive(user);
+        otpService.sendOtp(req.phone);
+        log.info("Admin OTP sent to: {}", req.phone);
+    }
+
+    public AuthResponse adminLoginWithOtp(VerifyOtpRequest req) {
+        User user = userRepository.findByPhone(req.phone)
+                .orElseThrow(() -> new RuntimeException(
+                        "No account found with this phone number."));
+
+        checkAccountActive(user);
+
+        boolean valid = otpService.verifyOtp(req.phone, req.otp);
+        if (!valid) {
+            throw new RuntimeException("Invalid or expired OTP. Please request a new one.");
+        }
+
+        if (user.getRole() != Role.ADMIN) {
+            log.warn("Admin login attempted by non-admin after OTP verify: {}", req.phone);
+            throw new RuntimeException("Access denied.");
+        }
+
+        log.info("Admin logged in: {}", req.phone);
+        return buildAuthResponse(user);
+    }
 
     private void checkAccountActive(User user) {
         if (!user.isActive()) {

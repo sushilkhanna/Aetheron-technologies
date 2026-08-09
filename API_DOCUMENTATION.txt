@@ -1,0 +1,168 @@
+====================================================================================================
+                             BIKE POOLING APP - BACKEND API DOCUMENTATION
+====================================================================================================
+Target Audience: Frontend Engineer / Mobile App Developers / Integration Team
+Base URL: http://<your-server-domain-or-ip>:8080
+Authentication Header: Authorization: Bearer <JWT_TOKEN> (Required for all protected endpoints)
+
+----------------------------------------------------------------------------------------------------
+                                      MASTER ENUM DEFINITIONS
+----------------------------------------------------------------------------------------------------
+Whenever a request or response field references an ENUM, only the specific string values listed below
+are allowed.
+
+1. Role:
+   - GUEST
+   - USER
+   - RIDER
+   - DRIVER
+   - ADMIN
+
+2. Gender:
+   - MALE
+   - FEMALE
+   - OTHERS
+
+3. PreferredGender:
+   - MALE
+   - FEMALE
+   - ANY
+
+4. PaymentMode:
+   - PAY_NOW
+   - PAY_ON_COMPLETION
+
+5. ScheduledRideStatus:
+   - ACTIVE        (Template is live and generating instances)
+   - CANCELLED     (Driver cancelled the whole scheduled ride template)
+   - EXPIRED       (Template/instances expired)
+
+6. ApplicationStatus:
+   - PENDING       (Booker applied, waiting for driver confirmation)
+   - CONFIRMED     (Driver accepted the booker)
+   - REJECTED      (Driver rejected the booker)
+   - WITHDRAWN     (Booker cancelled their own application)
+   - FINISH        (Application finished)
+   - EXPIRED       (Ride expired before response)
+
+7. RideState:
+   - OPEN          (Ride posted, waiting for applicants)
+   - LIVE          (Ride is active / live)
+   - BOOKED        (Driver confirmed a booker)
+   - STARTED       (Ride has started)
+   - VERIFIED      (OTP verified)
+   - COMPLETED     (Ride completed)
+   - CANCELLED     (Cancelled by driver or booker)
+   - EXPIRED       (Depart time passed without booking)
+   - SOS_TRIGGERED (SOS emergency raised on this ride)
+
+8. SosStatus:
+   - TRIGGERED     (Emergency alert raised)
+   - RESOLVED      (Resolved by user or admin)
+   - FALSE_ALARM   (Marked as false alarm)
+   - EXPIRED       (Alert expired)
+
+9. DayOfWeek (Standard Java Enum):
+   - MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
+
+
+====================================================================================================
+                             MODULE 7: WEBSOCKET CHAT SYSTEM (3 CORE APIS)
+====================================================================================================
+
+WebSocket Connect URL: ws://<server>:8080/ws
+Real-time STOMP Destination to Send: /app/chat.send
+Real-time STOMP Destination to Subscribe (Receiver): /topic/user/{userId}/messages
+
+----------------------------------------------------------------------------------------------------
+1. GET /api/chat/conversations
+----------------------------------------------------------------------------------------------------
+Description: Retrieves person/conversations list for inbox screen showing counterparty details and last message received/sent.
+Auth Required: Yes (Bearer Token)
+
+REQUEST DTO: None
+
+RESPONSE DTO (JSON Example):
+{
+  "success": true,
+  "message": "Conversations fetched.",
+  "data": [
+    {
+      "templateId": 501,
+      "routeSummary": "Hinjawadi -> Kharadi",
+      "otherUserId": 102,
+      "otherUserName": "Priya Patel",
+      "lastMessage": "Hey, I am waiting near the main gate.",
+      "lastMessageTime": "2026-08-09T14:45:00",
+      "lastMessageRead": false,
+      "lastMessageFromMe": true,
+      "unreadCount": 0
+    }
+  ]
+}
+
+----------------------------------------------------------------------------------------------------
+2. GET /api/chat/messages/{otherUserId}
+----------------------------------------------------------------------------------------------------
+Description: Fetches chat message history with a particular person (by user ID or applicant ID). AUTOMATICALLY MARKS ALL UNREAD MESSAGES AS READ upon fetching!
+Auth Required: Yes (Bearer Token)
+URL Path Variable: otherUserId (e.g. 102 or applicant ID 301)
+URL Query Parameters: page (default 0), size (default 20)
+
+REQUEST DTO: None
+
+RESPONSE DTO (JSON Example):
+{
+  "success": true,
+  "message": "Messages fetched.",
+  "data": {
+    "content": [
+      {
+        "id": 8001,
+        "templateId": 501,
+        "senderId": 101,
+        "senderName": "Rahul Sharma",
+        "receiverId": 102,
+        "receiverName": "Priya Patel",
+        "content": "Hey, I am waiting near the main gate.",
+        "read": true,                  // Automatically marked as read!
+        "createdAt": "2026-08-09T14:45:00"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1,
+    "first": true,
+    "last": true
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+3. WEBSOCKET STOMP /app/chat.send  (REST Fallback: POST /api/chat/send)
+----------------------------------------------------------------------------------------------------
+Description: Sends a chat message to a particular person. ALLOWED ONLY IF sender & receiver have a PRESENT RIDE BOOKED or active application together! Real-time broadcasted over WebSocket & sends FCM push notification.
+
+REQUEST PAYLOAD (JSON Example):
+{
+  "receiverId": 102,                   // Direct user ID, applicant user ID, OR applicationId (e.g. 301)
+  "templateId": 501,                   // Optional: Scheduled ride template ID
+  "content": "Hey, I am waiting near the main gate." // Required: Max 1000 characters
+}
+
+REST RESPONSE DTO (JSON Example):
+{
+  "success": true,
+  "message": "Message sent.",
+  "data": {
+    "id": 8001,
+    "templateId": 501,
+    "senderId": 101,
+    "senderName": "Rahul Sharma",
+    "receiverId": 102,
+    "receiverName": "Priya Patel",
+    "content": "Hey, I am waiting near the main gate.",
+    "read": false,
+    "createdAt": "2026-08-09T14:45:00"
+  }
+}

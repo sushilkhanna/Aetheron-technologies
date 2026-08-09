@@ -31,3 +31,12 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secrets & Private Configuration ###
+firebase-service-account.json
+*.json.secret
+*.pem
+*.key
+*.p12
+.env
+.env.*

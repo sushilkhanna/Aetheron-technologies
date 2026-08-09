@@ -14,7 +14,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-
 import java.io.IOException;
 import java.util.List;
 
@@ -22,8 +21,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
+    private final JwtUtil             jwtUtil;
     private final StringRedisTemplate redisTemplate;
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return true;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest  request,
@@ -54,14 +58,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String role   = claims.get("role", String.class);
+        String role        = claims.get("role", String.class);
+        var    authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+
+        UserPrincipal principal = new UserPrincipal(userId, role, authorities);
 
         UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken(
-                        userId,
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                );
+                new UsernamePasswordAuthenticationToken(principal, null, authorities);
 
         SecurityContextHolder.getContext().setAuthentication(auth);
         chain.doFilter(request, response);

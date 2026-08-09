@@ -42,17 +42,6 @@ public class AuthController {
     }
 
 
-//    @PostMapping("/login/password")
-//    public ResponseEntity<ApiResponse<AuthResponse>> loginWithPassword(
-//            @Valid @RequestBody LoginWithPasswordRequest req) {
-//
-//        AuthResponse auth = authService.loginWithPassword(req);
-//        return ResponseEntity.ok(
-//                ApiResponse.ok("Login successful", auth)
-//        );
-//    }
-
-
     @PostMapping("/login/send-otp")
     public ResponseEntity<ApiResponse<Void>> sendLoginOtp(
             @Valid @RequestBody SendOtpRequest req) {
@@ -74,15 +63,23 @@ public class AuthController {
         );
     }
 
+    @PostMapping("/admin/login/send-otp")
+    public ResponseEntity<ApiResponse<Void>> sendAdminLoginOtp(
+            @Valid @RequestBody SendOtpRequest req) {
 
-//    @PostMapping("/change-password")
-//    public ResponseEntity<ApiResponse<Void>> changePassword(
-//            @AuthenticationPrincipal Long userId,
-//            @Valid @RequestBody ChangePasswordRequest req) {
-//
-//        authService.changePassword(userId, req);
-//        return ResponseEntity.ok(
-//                ApiResponse.ok("Password changed successfully.")
-//        );
-//    }
+        authService.sendAdminLoginOtp(req);
+        return ResponseEntity.ok(
+                ApiResponse.ok("OTP sent to " + req.phone)
+        );
+    }
+
+    @PostMapping("/admin/login/verify-otp")
+    public ResponseEntity<ApiResponse<AuthResponse>> adminLoginWithOtp(
+            @Valid @RequestBody VerifyOtpRequest req) {
+
+        AuthResponse auth = authService.adminLoginWithOtp(req);
+        return ResponseEntity.ok(
+                ApiResponse.ok("Admin login successful", auth)
+        );
+    }
 }

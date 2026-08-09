@@ -1,11 +1,12 @@
 package com.bikepooling.config;
 
+import com.bikepooling.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.annotation.Order;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -14,58 +15,106 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
 
+/**
+ * Redis-backed rate limiter.
+ *
+ * IP limits  — applied to public auth endpoints (no JWT needed)
+ * User limits — applied to authenticated API endpoints
+ *
+ * Note: @Order is intentionally absent. Adding @Order to a @Component filter
+ * registers it in the root servlet filter chain, causing it to run twice
+ * (once outside Spring Security, once inside). Ordering is controlled solely
+ * by SecurityConfig.addFilterBefore().
+ */
+@Slf4j
 @Component
-@Order(1)
 @RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final StringRedisTemplate redisTemplate;
+    private final JwtUtil             jwtUtil;
 
-    // endpoints to protect → max hits allowed per window
-    private static final Map<String, Integer> LIMITS = Map.of(
-            "/api/auth/register",                5,
+    private static final Map<String, Integer> IP_LIMITS = Map.of(
+            "/api/auth/register",                 5,
             "/api/auth/verify-registration-otp", 10,
-            "/api/auth/login/send-otp",          5,
-            "/api/auth/login/verify-otp",        10,
-            "/api/auth/login/password",          10
+            "/api/auth/login/send-otp",           5,
+            "/api/auth/login/verify-otp",         10,
+            "/api/auth/login/password",           10
     );
 
-    private static final Duration WINDOW = Duration.ofMinutes(1);
+    private static final Map<String, Integer> USER_LIMITS = Map.of(
+            "/api/rides",    30,
+            "/api/vehicles", 20
+    );
+
+    private static final Duration WINDOW_1_MIN = Duration.ofMinutes(1);
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
+    protected void doFilterInternal(HttpServletRequest  request,
                                     HttpServletResponse response,
-                                    FilterChain chain)
+                                    FilterChain         chain)
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
 
-        // skip if not a protected endpoint
-        if (!LIMITS.containsKey(path)) {
+        // IP-based rate limit for public auth endpoints
+        if (IP_LIMITS.containsKey(path)) {
+            if (isRateLimited(
+                    "rl:ip:" + getClientIp(request) + ":" + path,
+                    IP_LIMITS.get(path),
+                    WINDOW_1_MIN,
+                    response)) return;
+
             chain.doFilter(request, response);
             return;
         }
 
-        String ip    = getClientIp(request);
-        String key   = "rl:" + ip + ":" + path;
-        int    limit = LIMITS.get(path);
-
-        Long count = redisTemplate.opsForValue().increment(key);
-        if (count == 1) {
-            redisTemplate.expire(key, WINDOW);
+        // User-based rate limit for authenticated endpoints
+        String userId = extractUserId(request);
+        if (userId == null) {
+            chain.doFilter(request, response);
+            return;
         }
 
+        if (path.startsWith("/api/rides") || path.startsWith("/api/vehicles")) {
+            String prefix = path.startsWith("/api/rides") ? "rides" : "vehicles";
+            if (isRateLimited(
+                    "rl:user:" + userId + ":" + prefix,
+                    USER_LIMITS.getOrDefault("/api/" + prefix, 60),
+                    WINDOW_1_MIN,
+                    response)) return;
+        }
+
+        chain.doFilter(request, response);
+    }
+
+    private boolean isRateLimited(String key, int limit,
+                                  Duration window,
+                                  HttpServletResponse response) throws IOException {
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count == 1) {
+            redisTemplate.expire(key, window);
+        }
         if (count != null && count > limit) {
             response.setStatus(429);
             response.setContentType("application/json");
             response.getWriter().write(
                     "{\"success\":false,\"data\":null," +
-                            "\"message\":\"Too many requests. Please slow down.\"}"
-            );
-            return;
+                            "\"message\":\"Too many requests. Please slow down.\"}");
+            log.warn("Rate limit hit: key={} count={} limit={}", key, count, limit);
+            return true;
         }
+        return false;
+    }
 
-        chain.doFilter(request, response);
+    private String extractUserId(HttpServletRequest request) {
+        try {
+            String header = request.getHeader("Authorization");
+            if (header == null || !header.startsWith("Bearer ")) return null;
+            return String.valueOf(jwtUtil.extractUserId(header.substring(7)));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String getClientIp(HttpServletRequest request) {

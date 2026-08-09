@@ -10,6 +10,7 @@ import com.bikepooling.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.bikepooling.dto.request.UpdateEmergencyContactsRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +38,7 @@ public class UserProfileService {
 
         user.setGender(req.getGender());
         user.setAddress(req.getAddress());
-        user.setRole(req.getRole());
+        user.setRole(Role.USER);
 
         return toProfileResponse(userRepository.save(user));
     }
@@ -69,6 +70,40 @@ public class UserProfileService {
         }
 
         return toProfileResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void updateEmergencyContacts(Long userId, UpdateEmergencyContactsRequest req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> AppException.notFound("User not found"));
+
+        validateContact(req.getContact1Name(), req.getContact1Phone(), "1");
+        validateContact(req.getContact2Name(), req.getContact2Phone(), "2");
+        validateContact(req.getContact3Name(), req.getContact3Phone(), "3");
+
+        user.setEmergencyContact1Name(blankToNull(req.getContact1Name()));
+        user.setEmergencyContact1Phone(blankToNull(req.getContact1Phone()));
+        user.setEmergencyContact2Name(blankToNull(req.getContact2Name()));
+        user.setEmergencyContact2Phone(blankToNull(req.getContact2Phone()));
+        user.setEmergencyContact3Name(blankToNull(req.getContact3Name()));
+        user.setEmergencyContact3Phone(blankToNull(req.getContact3Phone()));
+
+        userRepository.save(user);
+    }
+
+    private void validateContact(String name, String phone, String slot) {
+        boolean nameBlank = name == null || name.isBlank();
+        boolean phoneBlank = phone == null || phone.isBlank();
+        if (nameBlank != phoneBlank) {
+            throw AppException.badRequest("Emergency contact " + slot + " needs both name and phone, or leave both empty");
+        }
+        if (!phoneBlank && !phone.replaceAll("[^0-9]", "").matches("^[0-9]{10,12}$")) {
+            throw AppException.badRequest("Emergency contact " + slot + " phone number looks invalid");
+        }
+    }
+
+    private String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value.trim();
     }
 
     public ProfileResponse getProfile(Long userId) {

@@ -57,7 +57,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     @Builder.Default
-    private Role role = Role.USER;
+    private Role role = Role.GUEST;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "gender", nullable = false)
@@ -66,6 +66,37 @@ public class User {
 
     @Column(name = "address")
     private String address;
+
+    @Column(name = "aadhaar_number", unique = true)
+    private String aadhaarNumber;
+
+    @Column(name = "aadhaar_verified", nullable = false)
+    private boolean aadhaarVerified = false;
+
+    @Column(name = "dl_number", unique = true)
+    private String dlNumber;
+
+    @Column(name = "dl_verified", nullable = false)
+    private boolean dlVerified = false;
+
+    // ── Emergency contacts (max 3) ──────────────────────────────────────────
+    @Column(name = "emergency_contact_1_name")
+    private String emergencyContact1Name;
+
+    @Column(name = "emergency_contact_1_phone")
+    private String emergencyContact1Phone;
+
+    @Column(name = "emergency_contact_2_name")
+    private String emergencyContact2Name;
+
+    @Column(name = "emergency_contact_2_phone")
+    private String emergencyContact2Phone;
+
+    @Column(name = "emergency_contact_3_name")
+    private String emergencyContact3Name;
+
+    @Column(name = "emergency_contact_3_phone")
+    private String emergencyContact3Phone;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
