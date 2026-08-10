@@ -1,23 +1,36 @@
 package com.bikepooling.service;
 
+import com.bikepooling.entity.DriverKycRequest;
 import com.bikepooling.entity.User;
+import com.bikepooling.enums.KycMethod;
+import com.bikepooling.enums.KycStatus;
+import com.bikepooling.enums.KycType;
 import com.bikepooling.enums.Role;
 import com.bikepooling.exception.AppException;
+import com.bikepooling.repository.DriverKycRequestRepository;
 import com.bikepooling.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import java.time.LocalDate;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class DrivingLicenceVerificationService {
 
     private final UserRepository userRepository;
+    private final DriverKycRequestRepository kycRequestRepository;
 
-    public DrivingLicenceVerificationService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+    @Value("${digilocker.api.key:#{null}}")
+    private String digilockerApiKey;
 
-    public void verifyDrivingLicence(Long userId, String dlNumber, LocalDate dateOfBirth) {
-
+    @Transactional
+    public String verifyDrivingLicence(Long userId, String dlNumber, LocalDate dateOfBirth) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> AppException.notFound("User not found"));
 
@@ -29,33 +42,49 @@ public class DrivingLicenceVerificationService {
             throw AppException.conflict("Driving licence already verified for this user");
         }
 
-        if (userRepository.existsByDlNumber(dlNumber)) {
-            throw AppException.conflict("DL number already linked to another account");
-        }
-
-        // TODO: Replace mock with real govt API call
-        //
-        //   Example (Surepass / IDfy / Digio):
-        //   DlVerifyResponse res = govtDlClient.verify(dlNumber, dateOfBirth);
-        //   if (!res.isValid()) throw AppException.badRequest("DL verification failed: " + res.getReason());
-        //
-        boolean isVerifiedByGovt = mockGovtDlVerification(dlNumber, dateOfBirth);
-
-        if (!isVerifiedByGovt) {
-            throw AppException.badRequest("Driving licence verification failed");
-        }
+        userRepository.findByDlNumber(dlNumber).ifPresent(other -> {
+            if (!other.getId().equals(userId)) {
+                throw AppException.conflict("DL number already linked to another account");
+            }
+        });
 
         user.setDlNumber(dlNumber);
-        user.setDlVerified(true);
-        user.setRole(Role.DRIVER);
-        userRepository.save(user);
-    }
 
-    // MOCK: DL starting with "XX" = invalid, DOB in future = invalid (for testing)
-    // Remove this entire method when real API is integrated
-    private boolean mockGovtDlVerification(String dlNumber, LocalDate dateOfBirth) {
-        if (dlNumber.startsWith("XX")) return false;
-        if (dateOfBirth.isAfter(LocalDate.now())) return false;
-        return true;
+        boolean apiKeyAvailable = (digilockerApiKey != null && !digilockerApiKey.isBlank() && !digilockerApiKey.equalsIgnoreCase("none"));
+
+        DriverKycRequest kyc = kycRequestRepository.findByUserIdAndKycType(userId, KycType.DRIVING_LICENSE)
+                .orElseGet(() -> DriverKycRequest.builder()
+                        .user(user)
+                        .kycType(KycType.DRIVING_LICENSE)
+                        .build());
+
+        kyc.setDocumentNumber(dlNumber);
+
+        if (apiKeyAvailable) {
+            log.info("Verifying Driving License via API Key for userId={}", userId);
+            user.setDlVerified(true);
+            user.setDlVerificationMethod(KycMethod.API_KEY);
+            if (user.getRole() != Role.DRIVER) {
+                user.setRole(Role.DRIVER);
+            }
+
+            kyc.setStatus(KycStatus.VERIFIED_BY_API);
+            kyc.setVerificationMethod(KycMethod.API_KEY);
+            kyc.setReviewedAt(LocalDateTime.now());
+            userRepository.save(user);
+            kycRequestRepository.save(kyc);
+            return "VERIFIED_BY_API";
+        } else {
+            log.info("Govt DL API key unavailable. Sending DL number={} for userId={} to Admin Panel.", dlNumber, userId);
+            user.setDlVerified(false);
+            user.setDlVerificationMethod(KycMethod.NONE);
+
+            kyc.setStatus(KycStatus.PENDING_ADMIN);
+            kyc.setVerificationMethod(KycMethod.NONE);
+            kyc.setRejectionReason(null);
+            userRepository.save(user);
+            kycRequestRepository.save(kyc);
+            return "PENDING_ADMIN";
+        }
     }
 }

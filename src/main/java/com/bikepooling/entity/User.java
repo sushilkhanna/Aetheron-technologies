@@ -73,11 +73,19 @@ public class User {
     @Column(name = "aadhaar_verified", nullable = false)
     private boolean aadhaarVerified = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "aadhaar_verification_method")
+    private com.bikepooling.enums.KycMethod aadhaarVerificationMethod;
+
     @Column(name = "dl_number", unique = true)
     private String dlNumber;
 
     @Column(name = "dl_verified", nullable = false)
     private boolean dlVerified = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "dl_verification_method")
+    private com.bikepooling.enums.KycMethod dlVerificationMethod;
 
     // ── Emergency contacts (max 3) ──────────────────────────────────────────
     @Column(name = "emergency_contact_1_name")

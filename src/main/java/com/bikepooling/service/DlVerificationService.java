@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AadhaarVerificationService {
+public class DlVerificationService {
 
     private final UserRepository userRepository;
     private final DriverKycRequestRepository kycRequestRepository;
@@ -29,7 +29,7 @@ public class AadhaarVerificationService {
     private String digilockerApiKey;
 
     @Transactional
-    public String verifyAadhaar(Long userId, String aadhaarNumber, String documentImage) {
+    public String verifyDl(Long userId, String dlNumber, String documentImage) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> AppException.notFound("User not found"));
 
@@ -37,40 +37,40 @@ public class AadhaarVerificationService {
             throw AppException.conflict("First complete your profile");
         }
 
-        if (user.isAadhaarVerified()) {
-            throw AppException.conflict("Aadhaar already verified for this user");
+        if (user.isDlVerified()) {
+            throw AppException.conflict("Driving License already verified for this user");
         }
 
         // Check if linked to another user
-        userRepository.findByAadhaarNumber(aadhaarNumber).ifPresent(other -> {
+        userRepository.findByDlNumber(dlNumber).ifPresent(other -> {
             if (!other.getId().equals(userId)) {
-                throw AppException.conflict("Aadhaar number already linked to another account");
+                throw AppException.conflict("Driving License number already linked to another account");
             }
         });
 
-        user.setAadhaarNumber(aadhaarNumber);
+        user.setDlNumber(dlNumber);
 
         // Check if DigiLocker API Key is available & valid
         boolean apiKeyAvailable = (digilockerApiKey != null && !digilockerApiKey.isBlank() && !digilockerApiKey.equalsIgnoreCase("none"));
 
-        DriverKycRequest kyc = kycRequestRepository.findByUserIdAndKycType(userId, KycType.AADHAAR)
+        DriverKycRequest kyc = kycRequestRepository.findByUserIdAndKycType(userId, KycType.DRIVING_LICENSE)
                 .orElseGet(() -> DriverKycRequest.builder()
                         .user(user)
-                        .kycType(KycType.AADHAAR)
+                        .kycType(KycType.DRIVING_LICENSE)
                         .build());
 
-        kyc.setDocumentNumber(aadhaarNumber);
+        kyc.setDocumentNumber(dlNumber);
         if (documentImage != null && !documentImage.isBlank()) {
             kyc.setDocumentImage(documentImage);
         }
 
         if (apiKeyAvailable) {
-            // Simulated DigiLocker API Verification
-            log.info("Verifying Aadhaar via DigiLocker API Key for userId={}", userId);
-            user.setAadhaarVerified(true);
-            user.setAadhaarVerificationMethod(KycMethod.API_KEY);
-            if (user.getRole() == Role.USER) {
-                user.setRole(Role.RIDER);
+            // Simulated Gov API Verification
+            log.info("Verifying Driving License via API Key for userId={}", userId);
+            user.setDlVerified(true);
+            user.setDlVerificationMethod(KycMethod.API_KEY);
+            if (user.getRole() != Role.DRIVER) {
+                user.setRole(Role.DRIVER);
             }
 
             kyc.setStatus(KycStatus.VERIFIED_BY_API);
@@ -81,9 +81,9 @@ public class AadhaarVerificationService {
             return "VERIFIED_BY_API";
         } else {
             // API key not available / fails -> Fallback to Admin manual verification
-            log.info("DigiLocker API key unavailable. Sending Aadhaar number={} for userId={} to Admin Panel.", aadhaarNumber, userId);
-            user.setAadhaarVerified(false);
-            user.setAadhaarVerificationMethod(KycMethod.NONE);
+            log.info("Govt DL API key unavailable. Sending DL number={} for userId={} to Admin Panel.", dlNumber, userId);
+            user.setDlVerified(false);
+            user.setDlVerificationMethod(KycMethod.NONE);
 
             kyc.setStatus(KycStatus.PENDING_ADMIN);
             kyc.setVerificationMethod(KycMethod.NONE);

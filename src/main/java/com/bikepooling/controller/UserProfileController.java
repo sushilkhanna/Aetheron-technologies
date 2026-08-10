@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -49,22 +50,28 @@ public class UserProfileController {
     }
 
     @PostMapping("/verify-aadhaar")
-    public ResponseEntity<ApiResponse<Void>> verifyAadhaar(
+    public ResponseEntity<ApiResponse<Map<String, String>>> verifyAadhaar(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody AadhaarVerificationRequest req) {
 
-        aadhaarVerificationService.verifyAadhaar(principal.getUserId(), req.getAadhaarNumber());
-        return ResponseEntity.ok(ApiResponse.ok("Aadhaar verified successfully.", null));
+        String status = aadhaarVerificationService.verifyAadhaar(principal.getUserId(), req.getAadhaarNumber(), null);
+        String msg = "VERIFIED_BY_API".equalsIgnoreCase(status)
+                ? "Aadhaar verified successfully via DigiLocker API."
+                : "DigiLocker API key unavailable. Aadhaar verification request sent to Admin for manual review.";
+        return ResponseEntity.ok(ApiResponse.ok(msg, Map.of("status", status)));
     }
 
     @PostMapping("/verify-dl")
-    public ResponseEntity<ApiResponse<Void>> verifyDrivingLicence(
+    public ResponseEntity<ApiResponse<Map<String, String>>> verifyDrivingLicence(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody DrivingLicenceVerificationRequest req) {
 
-        dlVerificationService.verifyDrivingLicence(
+        String status = dlVerificationService.verifyDrivingLicence(
                 principal.getUserId(), req.getDlNumber(), req.getDateOfBirth());
-        return ResponseEntity.ok(ApiResponse.ok("Driving licence verified successfully.", null));
+        String msg = "VERIFIED_BY_API".equalsIgnoreCase(status)
+                ? "Driving licence verified successfully via API."
+                : "DigiLocker API key unavailable. Driving Licence verification request sent to Admin for manual review.";
+        return ResponseEntity.ok(ApiResponse.ok(msg, Map.of("status", status)));
     }
 
     @PutMapping("/emergency-contacts")
