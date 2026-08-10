@@ -1,4 +1,4 @@
-# Bike Pooling App - Complete Backend API Documentation
+# Bike Pooling App - Master API Documentation
 
 **Target Audience:** Frontend Engineer / Mobile App Developers / Integration Team  
 **Base URL:** `http://<your-server-domain-or-ip>:8080`  
@@ -14,109 +14,308 @@
 
 ---
 
-## 💬 7. Streamlined WebSocket Chat System (3 Core Endpoints)
+## 🔤 1. Master Enum Definitions & Allowed Values
 
-The Chat System is simplified into **3 core endpoints**:
+Whenever a request or response field references an **Enum**, only the exact string values listed below are accepted.
 
-1. **Inbox Person List:** `GET /api/chat/conversations` — Retrieves the list of persons/conversations with last message summary.
-2. **Read Chat History:** `GET /api/chat/messages/{otherUserId}` — Reads messages with a particular person by user ID or applicant ID. **Automatically marks incoming messages as `read = true` upon fetching**.
-3. **Send Message (WebSocket STOMP & REST Fallback):** STOMP `/app/chat.send` (or REST `POST /api/chat/send`) — Sends real-time message to a particular person. **ALLOWED ONLY IF sender & receiver have a present ride booked or active application**. Real-time WebSocket broadcast & FCM push notification included.
+```typescript
+// 1. User Role
+enum Role {
+  GUEST = "GUEST",
+  USER = "USER",
+  RIDER = "RIDER",
+  DRIVER = "DRIVER",
+  ADMIN = "ADMIN"
+}
 
----
+// 2. Gender
+enum Gender {
+  MALE = "MALE",
+  FEMALE = "FEMALE",
+  OTHERS = "OTHERS"
+}
 
-### 7.1 Inbox Person List
-- **API Call:** `GET /api/chat/conversations`
-- **Auth Required:** Yes (`Bearer <token>`)
+// 3. Preferred Driver Gender
+enum PreferredGender {
+  MALE = "MALE",
+  FEMALE = "FEMALE",
+  ANY = "ANY"
+}
 
-**Response DTO:**
-```json
-{
-  "success": true,
-  "message": "Conversations fetched.",
-  "data": [
-    {
-      "templateId": 501,
-      "routeSummary": "Hinjawadi -> Kharadi",
-      "otherUserId": 102,
-      "otherUserName": "Priya Patel",
-      "lastMessage": "Hey, I am waiting near the main gate.",
-      "lastMessageTime": "2026-08-09T14:45:00",
-      "lastMessageRead": false,
-      "lastMessageFromMe": true,
-      "unreadCount": 0
-    }
-  ]
+// 4. Payment Mode
+enum PaymentMode {
+  PAY_NOW = "PAY_NOW",
+  PAY_ON_COMPLETION = "PAY_ON_COMPLETION"
+}
+
+// 5. Scheduled Ride Template Status
+enum ScheduledRideStatus {
+  ACTIVE = "ACTIVE",
+  CANCELLED = "CANCELLED",
+  EXPIRED = "EXPIRED"
+}
+
+// 6. Booker Application Status (Per Day)
+enum ApplicationStatus {
+  PENDING = "PENDING",
+  CONFIRMED = "CONFIRMED",
+  REJECTED = "REJECTED",
+  WITHDRAWN = "WITHDRAWN",
+  FINISH = "FINISH",
+  EXPIRED = "EXPIRED"
+}
+
+// 7. Scheduled Ride Instance State
+enum RideState {
+  OPEN = "OPEN",
+  BOOKED = "BOOKED",
+  STARTED = "STARTED",             // Location stream to Booker & Admin live
+  VERIFIED = "VERIFIED",           // OTP verified; location stream to Booker stops, cache continues
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
+  EXPIRED = "EXPIRED",
+  SOS_TRIGGERED = "SOS_TRIGGERED"
+}
+
+// 8. Live Ride State (On-Demand System)
+enum LiveRideState {
+  LIVE = "LIVE",                   // Driver is LIVE waiting for matching bookers
+  CONFIRMED = "CONFIRMED",         // Driver accepted request; location streams to Booker UI
+  VERIFIED = "VERIFIED",           // Driver verified OTP; location stream to Booker stops, cache continues for Admin
+  COMPLETED = "COMPLETED",         // Ride finished
+  CANCELLED = "CANCELLED",         // Ride cancelled
+  EXPIRED = "EXPIRED"              // Ride search/live mode expired
+}
+
+// 9. SOS Emergency Status
+enum SosStatus {
+  TRIGGERED = "TRIGGERED",
+  RESOLVED = "RESOLVED",
+  FALSE_ALARM = "FALSE_ALARM",
+  EXPIRED = "EXPIRED"
 }
 ```
 
 ---
 
-### 7.2 Read Chat Messages (By User ID / Applicant ID)
-- **API Call:** `GET /api/chat/messages/{otherUserId}` *(or `/api/chat/messages/applicant/{applicantId}`)*
-- **Auth Required:** Yes (`Bearer <token>`)
-- **Behavior:** Automatically marks all incoming unread messages from `otherUserId` to current user as **`read = true`**!
+## 🚗 2. Live On-Demand Ride System (Core Real-Time APIs)
 
-**Response DTO:**
+The Live Ride feature allows drivers traveling real-time from origin to destination (e.g. Home -> Office) to go **LIVE**, receive on-demand requests from bookers along their route, verify OTPs, and stream real-time locations safely.
+
+### 2.1 Go Live (Driver)
+- **Call:** `POST /api/live-rides/go-live`
+- **Auth Required:** Authenticated Driver
+
 ```json
+// REQUEST
+{
+  "fromName": "Kothrud, Pune",
+  "fromLat": 18.5074000,
+  "fromLng": 73.8077000,
+  "toName": "Hinjawadi Phase 3, Pune",
+  "toLat": 18.5912000,
+  "toLng": 73.7389000,
+  "extraDistanceKm": 3.0,
+  "vehicleId": 5
+}
+
+// RESPONSE
 {
   "success": true,
-  "message": "Messages fetched.",
+  "message": "Live mode started.",
   "data": {
-    "content": [
-      {
-        "id": 8001,
-        "templateId": 501,
-        "senderId": 101,
-        "senderName": "Rahul Sharma",
-        "receiverId": 102,
-        "receiverName": "Priya Patel",
-        "content": "Hey, I am waiting near the main gate.",
-        "read": true,                  // Automatically marked as read!
-        "createdAt": "2026-08-09T14:45:00"
-      }
-    ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 1,
-    "totalPages": 1,
-    "first": true,
-    "last": true
+    "liveRideId": 801,
+    "driverId": 101,
+    "driverName": "Rahul Sharma",
+    "driverPhone": "+919876543210",
+    "vehicleNumber": "MH12AB1234",
+    "fromName": "Kothrud, Pune",
+    "toName": "Hinjawadi Phase 3, Pune",
+    "state": "LIVE"
   }
 }
 ```
 
 ---
 
-### 7.3 Send Chat Message (WebSocket STOMP & REST)
-- **WebSocket STOMP Destination:** `/app/chat.send`
-- **REST Fallback Call:** `POST /api/chat/send`
-- **Auth Required:** Yes (`Bearer <token>`)
-- **Present Ride Booking Enforcement:** Allowed **ONLY IF** user has a present ride booked (`CONFIRMED`, `BOOKED`, `STARTED`, `VERIFIED` or active application) with the recipient.
+### 2.2 Stop Live Mode (Driver)
+- **Call:** `POST /api/live-rides/stop-live`
+- **Auth Required:** Authenticated Driver
 
-**Request Payload:**
 ```json
+// RESPONSE
 {
-  "receiverId": 102,                   // Direct user ID, applicant user ID, OR applicationId (301)
-  "templateId": 501,                   // Optional: Scheduled ride template ID
-  "content": "Hey, I am waiting near the main gate."
+  "success": true,
+  "message": "Live mode stopped.",
+  "data": null
 }
 ```
 
-**REST Response DTO:**
+---
+
+### 2.3 Preview Distance & Fare (Booker)
+- **Call:** `POST /api/live-rides/preview`
+- **Auth Required:** Authenticated
+
 ```json
+// REQUEST
+{
+  "pickupName": "Bavdhan Chandani Chowk, Pune",
+  "pickupLat": 18.5089000,
+  "pickupLng": 73.7925000,
+  "dropName": "Wakad Bridge, Pune",
+  "dropLat": 18.5980000,
+  "dropLng": 73.7620000
+}
+
+// RESPONSE
 {
   "success": true,
-  "message": "Message sent.",
+  "message": "Fare preview calculated.",
   "data": {
-    "id": 8001,
-    "templateId": 501,
-    "senderId": 101,
-    "senderName": "Rahul Sharma",
-    "receiverId": 102,
-    "receiverName": "Priya Patel",
-    "content": "Hey, I am waiting near the main gate.",
-    "read": false,
-    "createdAt": "2026-08-09T14:45:00"
+    "pickupName": "Bavdhan Chandani Chowk, Pune",
+    "dropName": "Wakad Bridge, Pune",
+    "distanceKm": 10.40,
+    "estimatedFare": 62.40
   }
 }
 ```
+
+---
+
+### 2.4 Start Live Ride Search (Booker)
+- **Call:** `POST /api/live-rides/search/start`
+- **Auth Required:** Authenticated
+- **Behavior:** Calculates distance and fare, registers active search request, finds matching drivers within 2 km radius or route corridor, and sends FCM push notifications to drivers.
+
+```json
+// REQUEST
+{
+  "pickupName": "Bavdhan Chandani Chowk, Pune",
+  "pickupLat": 18.5089000,
+  "pickupLng": 73.7925000,
+  "dropName": "Wakad Bridge, Pune",
+  "dropLat": 18.5670000,
+  "dropLng": 73.9140000,
+  "note": "Waiting near bus stop."
+}
+
+// RESPONSE
+{
+  "success": true,
+  "message": "Live search started. Notified matching drivers nearby.",
+  "data": 1005 // searchRequestId
+}
+```
+
+---
+
+### 2.5 Accept Live Ride Request (Driver)
+- **Call:** `POST /api/live-rides/accept`
+- **Auth Required:** Authenticated Driver
+
+```json
+// REQUEST
+{
+  "searchRequestId": 1005
+}
+
+// RESPONSE
+{
+  "success": true,
+  "message": "Ride request accepted.",
+  "data": {
+    "liveRideId": 801,
+    "driverId": 101,
+    "driverName": "Rahul Sharma",
+    "driverPhone": "+919876543210",
+    "vehicleNumber": "MH12AB1234",
+    "bookerId": 102,
+    "bookerName": "Priya Patel",
+    "bookerPhone": "+919123456789",
+    "pickupName": "Bavdhan Chandani Chowk, Pune",
+    "dropName": "Wakad Bridge, Pune",
+    "distanceKm": 10.40,
+    "fare": 62.40,
+    "state": "CONFIRMED",             // Location streams to Booker STOMP topic!
+    "bookerOtp": "4821"              // 4-digit OTP shown to Booker
+  }
+}
+```
+
+---
+
+### 2.6 Verify Live Ride OTP (Driver)
+- **Call:** `POST /api/live-rides/{liveRideId}/verify-otp?otp=4821`
+- **Auth Required:** Authenticated Driver
+- **Behavior:** Updates state to `VERIFIED`. STOMP location stream to Booker UI **STOPS** (booker is on bike). Location updates **CONTINUE** saving to cache for safety monitoring and Admin map.
+
+```json
+// RESPONSE
+{
+  "success": true,
+  "message": "OTP verified successfully.",
+  "data": {
+    "liveRideId": 801,
+    "state": "VERIFIED"
+  }
+}
+```
+
+---
+
+### 2.7 Complete Live Ride (Driver)
+- **Call:** `POST /api/live-rides/{liveRideId}/complete`
+- **Auth Required:** Authenticated Driver
+
+```json
+// RESPONSE
+{
+  "success": true,
+  "message": "Live ride completed.",
+  "data": {
+    "liveRideId": 801,
+    "state": "COMPLETED"
+  }
+}
+```
+
+---
+
+### 2.8 Get Active Live Ride
+- **Call:** `GET /api/live-rides/active`
+- **Auth Required:** Authenticated (Driver or Booker)
+
+```json
+// RESPONSE
+{
+  "success": true,
+  "message": "Active live ride fetched.",
+  "data": {
+    "liveRideId": 801,
+    "state": "CONFIRMED",
+    "bookerOtp": "4821"
+  }
+}
+```
+
+---
+
+### 2.9 Real-Time Live Location Tracking & Safety Rules
+
+1. **Driver STOMP Location Push:**  
+   - **Destination:** `/app/live-rides/{liveRideId}/location`
+   - **Payload:** `{"lat": 18.5089, "lng": 73.7925, "bearingDegrees": 120.0, "speedKmh": 35.0, "timestamp": 1723245000000}`
+2. **Booker STOMP Location Subscribe:**  
+   - **Destination:** `/topic/live-rides/{liveRideId}/location`
+   - **Active Window:** Broadcasted ONLY in `CONFIRMED` state (when driver is on the way to pick up booker). After OTP verification (`VERIFIED`), broadcast to Booker STOPS automatically.
+3. **Safety Monitoring & Auto-Completion Rules:**
+   - **Drop Point Arrival:** Driver in 1 km radius of drop point for 5 minutes (or passing drop point) -> Auto-completes live ride and clears location cache.
+   - **Route Warning:** Driver >2 km off-route -> Booker receives FCM alert: *"Route is not the selected one, please make sure your safety."*
+   - **Off-Route Auto-Completion:** Driver off-route for 20 minutes -> Auto-completes live ride and clears location cache.
+
+---
+
+## 📅 3. Scheduled Ride System (Core Pooling APIs)
+
+*(Refer to Scheduled Ride Section for Template Posting, Multi-Date Search, Applicants Listing, and Confirmation)*

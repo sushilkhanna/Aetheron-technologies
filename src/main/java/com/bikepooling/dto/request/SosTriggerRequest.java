@@ -10,8 +10,8 @@ import java.math.BigDecimal;
 @Setter
 public class SosTriggerRequest {
 
-    @NotNull(message = "rideId is required")
-    private Long rideId;
+    @NotNull(message = "instanceId is required")
+    private Long instanceId;
 
     @NotNull(message = "latitude is required")
     private BigDecimal latitude;

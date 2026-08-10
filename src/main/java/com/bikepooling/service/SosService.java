@@ -33,32 +33,28 @@ public class SosService {
 
     private final SosRepository sosRepository;
     private final SosLocationPingRepository sosLocationPingRepository;
-    private final RideRepository rideRepository;
-    private final RideStatusRepository rideStatusRepository;
+    private final ScheduledRideInstanceRepository instanceRepository;
     private final UserRepository userRepository;
     private final Msg91SmsClient smsClient;
     private final FcmService fcmService;
 
     @Transactional
     public SosAlertResponse trigger(Long userId, SosTriggerRequest req) {
-        Ride ride = rideRepository.findById(req.getRideId())
-                .orElseThrow(() -> AppException.notFound("Ride not found"));
+        ScheduledRideInstance instance = instanceRepository.findByIdWithDetails(req.getInstanceId())
+                .orElseThrow(() -> AppException.notFound("Scheduled ride instance not found"));
 
         User triggeredBy = userRepository.findById(userId)
                 .orElseThrow(() -> AppException.notFound("User not found"));
 
-        RideStatus rideStatus = rideStatusRepository.findByRide_Id(ride.getId())
-                .orElseThrow(() -> AppException.notFound("Ride status not found"));
+        String role = resolveRole(instance, userId);
 
-        String role = resolveRole(ride, rideStatus, userId);
-
-        SosAlert alert = sosRepository.findByRide_IdAndStatus(ride.getId(), SosStatus.TRIGGERED)
+        SosAlert alert = sosRepository.findByInstance_IdAndStatus(instance.getId(), SosStatus.TRIGGERED)
                 .orElse(null);
 
         LocalDateTime now = LocalDateTime.now();
 
         if (alert != null) {
-            log.info("SOS already active for rideId={}, returning existing alertId={}", ride.getId(), alert.getId());
+            log.info("SOS already active for instanceId={}, returning existing alertId={}", instance.getId(), alert.getId());
             alert.setLatitude(req.getLatitude());
             alert.setLongitude(req.getLongitude());
             alert.setLastPingAt(now);
@@ -69,11 +65,11 @@ public class SosService {
                     .latitude(req.getLatitude())
                     .longitude(req.getLongitude())
                     .build());
-            return toResponse(alert, ride);
+            return toResponse(alert, instance);
         }
 
         alert = SosAlert.builder()
-                .ride(ride)
+                .instance(instance)
                 .triggeredBy(triggeredBy)
                 .triggeredByRole(role)
                 .latitude(req.getLatitude())
@@ -86,8 +82,8 @@ public class SosService {
 
         alert = sosRepository.save(alert);
 
-        rideStatus.setState(RideState.SOS_TRIGGERED);
-        rideStatusRepository.save(rideStatus);
+        instance.setState(RideState.SOS_TRIGGERED);
+        instanceRepository.save(instance);
 
         sosLocationPingRepository.save(SosLocationPing.builder()
                 .sosAlert(alert)
@@ -95,17 +91,17 @@ public class SosService {
                 .longitude(req.getLongitude())
                 .build());
 
-        log.warn("SOS TRIGGERED — alertId={} rideId={} userId={} role={} lat={} lng={}",
-                alert.getId(), ride.getId(), userId, role, req.getLatitude(), req.getLongitude());
+        log.warn("SOS TRIGGERED — alertId={} instanceId={} userId={} role={} lat={} lng={}",
+                alert.getId(), instance.getId(), userId, role, req.getLatitude(), req.getLongitude());
 
         String trackingLink = buildTrackingLink(alert.getTrackingToken());
-        String message = buildSosMessage(triggeredBy, ride, req.getLatitude(), req.getLongitude(), trackingLink);
+        String message = buildSosMessage(triggeredBy, instance, req.getLatitude(), req.getLongitude(), trackingLink);
 
-        boolean counterpartNotified = notifyCounterpart(ride, rideStatus, userId, role, triggeredBy, alert.getId());
+        boolean counterpartNotified = notifyCounterpart(instance, userId, role, triggeredBy, alert.getId());
         alert.setCounterpartNotified(counterpartNotified);
 
         List<User> admins = userRepository.findByRoleAndActiveTrue(Role.ADMIN);
-        notifyAdminsPush(admins, alert, ride, triggeredBy, role);
+        notifyAdminsPush(admins, alert, instance, triggeredBy, role);
         boolean adminSmsSent = notifyAdminsSms(admins, message);
         alert.setAdminSmsSent(adminSmsSent);
 
@@ -114,7 +110,7 @@ public class SosService {
 
         alert = sosRepository.save(alert);
 
-        return toResponse(alert, ride);
+        return toResponse(alert, instance);
     }
 
     @Transactional
@@ -205,7 +201,7 @@ public class SosService {
 
         applyResolution(alert, falseAlarm ? SosStatus.FALSE_ALARM : SosStatus.RESOLVED);
 
-        return toResponse(alert, alert.getRide());
+        return toResponse(alert, alert.getInstance());
     }
 
     @Transactional
@@ -218,12 +214,11 @@ public class SosService {
         alert.setResolvedAt(LocalDateTime.now());
         sosRepository.save(alert);
 
-        rideStatusRepository.findByRide_Id(alert.getRide().getId()).ifPresent(rideStatus -> {
-            if (rideStatus.getState() == RideState.SOS_TRIGGERED) {
-                rideStatus.setState(RideState.STARTED);
-                rideStatusRepository.save(rideStatus);
-            }
-        });
+        ScheduledRideInstance instance = alert.getInstance();
+        if (instance != null && instance.getState() == RideState.SOS_TRIGGERED) {
+            instance.setState(RideState.STARTED);
+            instanceRepository.save(instance);
+        }
 
         if (targetStatus == SosStatus.FALSE_ALARM && alert.isContactSmsSent()) {
             String standDown = alert.getTriggeredBy().getFullName()
@@ -236,15 +231,15 @@ public class SosService {
     }
 
     @Transactional
-    public void resolveActiveSosForRide(Long rideId) {
-        sosRepository.findByRide_IdAndStatus(rideId, SosStatus.TRIGGERED)
+    public void resolveActiveSosForInstance(Long instanceId) {
+        sosRepository.findByInstance_IdAndStatus(instanceId, SosStatus.TRIGGERED)
                 .ifPresent(alert -> {
-                    log.info("Ride {} completed with an active SOS (alertId={}) — auto-resolving", rideId, alert.getId());
+                    log.info("Instance {} completed with an active SOS (alertId={}) — auto-resolving", instanceId, alert.getId());
                     autoResolve(alert, SosStatus.RESOLVED);
                 });
     }
 
-    @Scheduled(fixedRate = 300000) // every 5 minutes
+    @Scheduled(fixedRate = 300000)
     @Transactional
     public void expireStaleAlerts() {
         List<SosAlert> active = sosRepository.findByStatusOrderByTriggeredAtDesc(SosStatus.TRIGGERED);
@@ -263,7 +258,7 @@ public class SosService {
         return sosRepository.findByStatusOrderByTriggeredAtDesc(SosStatus.TRIGGERED).stream()
                 .map(a -> SosActiveSummaryResponse.builder()
                         .alertId(a.getId())
-                        .rideId(a.getRide().getId())
+                        .instanceId(a.getInstance().getId())
                         .triggeredByName(a.getTriggeredBy().getFullName())
                         .triggeredByRole(a.getTriggeredByRole())
                         .status(a.getStatus())
@@ -272,24 +267,24 @@ public class SosService {
                 .collect(Collectors.toList());
     }
 
-    private String resolveRole(Ride ride, RideStatus rideStatus, Long userId) {
-        if (ride.getPostedBy().getId().equals(userId)) {
+    private String resolveRole(ScheduledRideInstance instance, Long userId) {
+        if (instance.getTemplate().getPostedBy().getId().equals(userId)) {
             return "DRIVER";
         }
-        if (rideStatus.getBookedBy() != null && rideStatus.getBookedBy().getId().equals(userId)) {
+        if (instance.getBookedBy() != null && instance.getBookedBy().getId().equals(userId)) {
             return "RIDER";
         }
         throw AppException.forbidden("You are not part of this ride");
     }
 
-    private boolean notifyCounterpart(Ride ride, RideStatus rideStatus, Long triggeringUserId,
-                                      String triggeringRole, User triggeredBy, Long alertId) {
+    private boolean notifyCounterpart(ScheduledRideInstance instance, Long triggeringUserId,
+                                       String triggeringRole, User triggeredBy, Long alertId) {
         Long counterpartUserId = null;
 
         if ("RIDER".equals(triggeringRole)) {
-            counterpartUserId = ride.getPostedBy().getId();
-        } else if ("DRIVER".equals(triggeringRole) && rideStatus.getBookedBy() != null) {
-            counterpartUserId = rideStatus.getBookedBy().getId();
+            counterpartUserId = instance.getTemplate().getPostedBy().getId();
+        } else if ("DRIVER".equals(triggeringRole) && instance.getBookedBy() != null) {
+            counterpartUserId = instance.getBookedBy().getId();
         }
 
         if (counterpartUserId == null || counterpartUserId.equals(triggeringUserId)) {
@@ -300,18 +295,18 @@ public class SosService {
                 counterpartUserId,
                 "Emergency SOS triggered",
                 triggeredBy.getFullName() + " has triggered an SOS on this ride. Please check on them immediately.",
-                Map.of("type", "SOS_TRIGGERED", "sosAlertId", String.valueOf(alertId), "rideId", String.valueOf(ride.getId()))
+                Map.of("type", "SOS_TRIGGERED", "sosAlertId", String.valueOf(alertId), "instanceId", String.valueOf(instance.getId()))
         );
         return true;
     }
 
-    private void notifyAdminsPush(List<User> admins, SosAlert alert, Ride ride, User triggeredBy, String role) {
+    private void notifyAdminsPush(List<User> admins, SosAlert alert, ScheduledRideInstance instance, User triggeredBy, String role) {
         for (User admin : admins) {
             fcmService.sendToUser(
                     admin.getId(),
                     "SOS Alert",
-                    triggeredBy.getFullName() + " (" + role + ") triggered SOS on ride #" + ride.getId(),
-                    Map.of("type", "SOS_ALERT", "sosAlertId", String.valueOf(alert.getId()), "rideId", String.valueOf(ride.getId()))
+                    triggeredBy.getFullName() + " (" + role + ") triggered SOS on scheduled ride instance #" + instance.getId(),
+                    Map.of("type", "SOS_ALERT", "sosAlertId", String.valueOf(alert.getId()), "instanceId", String.valueOf(instance.getId()))
             );
         }
     }
@@ -352,24 +347,26 @@ public class SosService {
         return "https://yourapp.example.com/sos/track/" + trackingToken;
     }
 
-    private String buildSosMessage(User user, Ride ride, BigDecimal lat, BigDecimal lng, String trackingLink) {
-        String driverName = ride.getPostedBy().getFullName();
-        String driverPhone = ride.getPostedBy().getPhone();
-        String vehicleNumber = ride.getVehicle() != null ? ride.getVehicle().getVehicleNumber() : "N/A";
+    private String buildSosMessage(User user, ScheduledRideInstance instance, BigDecimal lat, BigDecimal lng, String trackingLink) {
+        ScheduledRideTemplate template = instance.getTemplate();
+        String driverName = template.getPostedBy().getFullName();
+        String driverPhone = template.getPostedBy().getPhone();
+        String vehicleNumber = template.getVehicle() != null ? template.getVehicle().getVehicleNumber() : "N/A";
 
-        return "EMERGENCY: " + user.getFullName() + " pressed SOS during a ride (#" + ride.getId() + ").\n"
+        return "EMERGENCY: " + user.getFullName() + " pressed SOS during a ride (#" + instance.getId() + ").\n"
                 + "Driver: " + driverName + " (" + driverPhone + "), Vehicle: " + vehicleNumber + "\n"
-                + "Route: " + ride.getFromName() + " -> " + ride.getToName() + "\n"
+                + "Route: " + template.getFromName() + " -> " + template.getToName() + "\n"
                 + "Current location: https://maps.google.com/?q=" + lat + "," + lng + "\n"
                 + "Live tracking: " + trackingLink + "\n"
                 + "Please respond immediately.";
     }
 
-    private SosAlertResponse toResponse(SosAlert alert, Ride ride) {
+    private SosAlertResponse toResponse(SosAlert alert, ScheduledRideInstance instance) {
+        ScheduledRideTemplate template = instance.getTemplate();
         return SosAlertResponse.builder()
                 .id(alert.getId())
                 .trackingToken(alert.getTrackingToken())
-                .rideId(ride.getId())
+                .instanceId(instance.getId())
                 .triggeredByUserId(alert.getTriggeredBy().getId())
                 .triggeredByName(alert.getTriggeredBy().getFullName())
                 .triggeredByRole(alert.getTriggeredByRole())
@@ -382,11 +379,11 @@ public class SosService {
                 .counterpartNotified(alert.isCounterpartNotified())
                 .triggeredAt(alert.getTriggeredAt())
                 .resolvedAt(alert.getResolvedAt())
-                .driverName(ride.getPostedBy().getFullName())
-                .driverPhone(ride.getPostedBy().getPhone())
-                .vehicleNumber(ride.getVehicle() != null ? ride.getVehicle().getVehicleNumber() : null)
-                .fromName(ride.getFromName())
-                .toName(ride.getToName())
+                .driverName(template.getPostedBy().getFullName())
+                .driverPhone(template.getPostedBy().getPhone())
+                .vehicleNumber(template.getVehicle() != null ? template.getVehicle().getVehicleNumber() : null)
+                .fromName(template.getFromName())
+                .toName(template.getToName())
                 .build();
     }
 }

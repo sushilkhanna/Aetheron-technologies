@@ -38,6 +38,18 @@ public interface ScheduledRideApplicationRepository extends JpaRepository<Schedu
             @Param("userA") Long userA,
             @Param("userB") Long userB);
 
+    @Query("""
+        SELECT DISTINCT a FROM ScheduledRideApplication a
+        JOIN FETCH a.template t
+        JOIN FETCH t.postedBy
+        LEFT JOIN FETCH t.vehicle
+        LEFT JOIN FETCH a.days d
+        LEFT JOIN FETCH d.instance i
+        WHERE a.booker.id = :bookerId
+        ORDER BY a.createdAt DESC
+        """)
+    List<ScheduledRideApplication> findByBookerIdWithDetails(@Param("bookerId") Long bookerId);
+
     @Query("select d from ScheduledRideApplicationDay d " +
             "join fetch d.application a join fetch a.booker " +
             "join fetch d.instance i join fetch i.template t join fetch t.postedBy " +

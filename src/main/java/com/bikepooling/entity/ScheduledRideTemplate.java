@@ -2,7 +2,6 @@ package com.bikepooling.entity;
 
 import com.bikepooling.enums.PaymentMode;
 import com.bikepooling.enums.PreferredGender;
-import com.bikepooling.enums.ScheduleWeek;
 import com.bikepooling.enums.ScheduledRideStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -10,7 +9,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -80,24 +78,18 @@ public class ScheduledRideTemplate {
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
-            name = "scheduled_ride_template_days",
+            name = "scheduled_ride_template_dates",
             joinColumns = @JoinColumn(name = "template_id"))
-    @Enumerated(EnumType.STRING)
-    @Column(name = "day_of_week", nullable = false, length = 10)
+    @Column(name = "ride_date", nullable = false)
     @Builder.Default
-    private Set<DayOfWeek> days = new HashSet<>();
+    private Set<LocalDate> dates = new HashSet<>();
 
-    /** CURRENT (today to Saturday this week) or NEXT (Sunday to Saturday next week) -- never both. */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "scheduled_week", nullable = false, length = 10)
-    private ScheduleWeek scheduledWeek;
-
-    /** First bookable date within the chosen week block. */
-    @Column(name = "week_start", nullable = false)
+    /** First bookable date selected. */
+    @Column(name = "week_start")
     private LocalDate weekStart;
 
-    /** Last bookable date within the chosen week block -- always a Saturday. */
-    @Column(name = "week_end", nullable = false)
+    /** Last bookable date selected. */
+    @Column(name = "week_end")
     private LocalDate weekEnd;
 
     @Enumerated(EnumType.STRING)

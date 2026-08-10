@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class SosAlertResponse {
     private Long id;
     private String trackingToken;
-    private Long rideId;
+    private Long instanceId;
     private Long triggeredByUserId;
     private String triggeredByName;
     private String triggeredByRole;

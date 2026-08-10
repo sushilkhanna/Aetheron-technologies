@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 public class SosActiveSummaryResponse {
     private Long alertId;
-    private Long rideId;
+    private Long instanceId;
     private String triggeredByName;
     private String triggeredByRole;
     private SosStatus status;

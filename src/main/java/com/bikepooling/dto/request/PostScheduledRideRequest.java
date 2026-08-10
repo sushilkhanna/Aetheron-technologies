@@ -2,14 +2,13 @@ package com.bikepooling.dto.request;
 
 import com.bikepooling.enums.PaymentMode;
 import com.bikepooling.enums.PreferredGender;
-import com.bikepooling.enums.ScheduleWeek;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Set;
 
@@ -35,12 +34,8 @@ public class PostScheduledRideRequest {
     @NotNull(message = "Departure time is required")
     private LocalTime departTime;
 
-    /** Which week block this scheduled ride applies to -- CURRENT or NEXT, never a mix. */
-    @NotNull(message = "Select whether this ride is for the current week or next week")
-    private ScheduleWeek week;
-
-    @NotEmpty(message = "Select at least one day")
-    private Set<DayOfWeek> days;
+    @NotEmpty(message = "Select at least one date")
+    private Set<LocalDate> dates;
 
     @NotNull
     private PaymentMode paymentMode;

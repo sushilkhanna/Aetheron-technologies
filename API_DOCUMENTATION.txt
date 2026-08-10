@@ -4,165 +4,104 @@
 Target Audience: Frontend Engineer / Mobile App Developers / Integration Team
 Base URL: http://<your-server-domain-or-ip>:8080
 Authentication Header: Authorization: Bearer <JWT_TOKEN> (Required for all protected endpoints)
+Response Wrapper: All standard REST endpoints return responses wrapped inside ApiResponse<T>:
+{
+  "success": true,
+  "message": "Human-readable status message",
+  "data": { ... }
+}
 
 ----------------------------------------------------------------------------------------------------
-                                      MASTER ENUM DEFINITIONS
+                                       MASTER ENUM DEFINITIONS
 ----------------------------------------------------------------------------------------------------
-Whenever a request or response field references an ENUM, only the specific string values listed below
-are allowed.
-
-1. Role:
-   - GUEST
-   - USER
-   - RIDER
-   - DRIVER
-   - ADMIN
-
-2. Gender:
-   - MALE
-   - FEMALE
-   - OTHERS
-
-3. PreferredGender:
-   - MALE
-   - FEMALE
-   - ANY
-
-4. PaymentMode:
-   - PAY_NOW
-   - PAY_ON_COMPLETION
-
-5. ScheduledRideStatus:
-   - ACTIVE        (Template is live and generating instances)
-   - CANCELLED     (Driver cancelled the whole scheduled ride template)
-   - EXPIRED       (Template/instances expired)
-
-6. ApplicationStatus:
-   - PENDING       (Booker applied, waiting for driver confirmation)
-   - CONFIRMED     (Driver accepted the booker)
-   - REJECTED      (Driver rejected the booker)
-   - WITHDRAWN     (Booker cancelled their own application)
-   - FINISH        (Application finished)
-   - EXPIRED       (Ride expired before response)
-
-7. RideState:
-   - OPEN          (Ride posted, waiting for applicants)
-   - LIVE          (Ride is active / live)
-   - BOOKED        (Driver confirmed a booker)
-   - STARTED       (Ride has started)
-   - VERIFIED      (OTP verified)
-   - COMPLETED     (Ride completed)
-   - CANCELLED     (Cancelled by driver or booker)
-   - EXPIRED       (Depart time passed without booking)
-   - SOS_TRIGGERED (SOS emergency raised on this ride)
-
-8. SosStatus:
-   - TRIGGERED     (Emergency alert raised)
-   - RESOLVED      (Resolved by user or admin)
-   - FALSE_ALARM   (Marked as false alarm)
-   - EXPIRED       (Alert expired)
-
-9. DayOfWeek (Standard Java Enum):
-   - MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
+1. Role: GUEST, USER, RIDER, DRIVER, ADMIN
+2. Gender: MALE, FEMALE, OTHERS
+3. PreferredGender: MALE, FEMALE, ANY
+4. PaymentMode: PAY_NOW, PAY_ON_COMPLETION
+5. ScheduledRideStatus: ACTIVE, CANCELLED, EXPIRED
+6. ApplicationStatus: PENDING, CONFIRMED, REJECTED, WITHDRAWN, FINISH, EXPIRED
+7. RideState: OPEN, BOOKED, STARTED, VERIFIED, COMPLETED, CANCELLED, EXPIRED, SOS_TRIGGERED
+8. LiveRideState: LIVE, CONFIRMED, VERIFIED, COMPLETED, CANCELLED, EXPIRED
+9. SosStatus: TRIGGERED, RESOLVED, FALSE_ALARM, EXPIRED
+10. DayOfWeek: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
 
 
 ====================================================================================================
-                             MODULE 7: WEBSOCKET CHAT SYSTEM (3 CORE APIS)
+                              MODULE 1: LIVE ON-DEMAND RIDE SYSTEM (CORE APIS)
 ====================================================================================================
 
-WebSocket Connect URL: ws://<server>:8080/ws
-Real-time STOMP Destination to Send: /app/chat.send
-Real-time STOMP Destination to Subscribe (Receiver): /topic/user/{userId}/messages
-
+1.1 POST /api/live-rides/go-live (Driver Go Live)
 ----------------------------------------------------------------------------------------------------
-1. GET /api/chat/conversations
-----------------------------------------------------------------------------------------------------
-Description: Retrieves person/conversations list for inbox screen showing counterparty details and last message received/sent.
-Auth Required: Yes (Bearer Token)
-
-REQUEST DTO: None
-
-RESPONSE DTO (JSON Example):
+REQUEST PAYLOAD:
 {
-  "success": true,
-  "message": "Conversations fetched.",
-  "data": [
-    {
-      "templateId": 501,
-      "routeSummary": "Hinjawadi -> Kharadi",
-      "otherUserId": 102,
-      "otherUserName": "Priya Patel",
-      "lastMessage": "Hey, I am waiting near the main gate.",
-      "lastMessageTime": "2026-08-09T14:45:00",
-      "lastMessageRead": false,
-      "lastMessageFromMe": true,
-      "unreadCount": 0
-    }
-  ]
+  "fromName": "Kothrud, Pune",
+  "fromLat": 18.5074000,
+  "fromLng": 73.8077000,
+  "toName": "Hinjawadi Phase 3, Pune",
+  "toLat": 18.5912000,
+  "toLng": 73.7389000,
+  "extraDistanceKm": 3.0,
+  "vehicleId": 5
 }
 
+1.2 POST /api/live-rides/stop-live (Driver Stop Live Mode)
 ----------------------------------------------------------------------------------------------------
-2. GET /api/chat/messages/{otherUserId}
+
+1.3 POST /api/live-rides/preview (Booker Preview Distance & Fare)
 ----------------------------------------------------------------------------------------------------
-Description: Fetches chat message history with a particular person (by user ID or applicant ID). AUTOMATICALLY MARKS ALL UNREAD MESSAGES AS READ upon fetching!
-Auth Required: Yes (Bearer Token)
-URL Path Variable: otherUserId (e.g. 102 or applicant ID 301)
-URL Query Parameters: page (default 0), size (default 20)
-
-REQUEST DTO: None
-
-RESPONSE DTO (JSON Example):
+REQUEST PAYLOAD:
 {
-  "success": true,
-  "message": "Messages fetched.",
-  "data": {
-    "content": [
-      {
-        "id": 8001,
-        "templateId": 501,
-        "senderId": 101,
-        "senderName": "Rahul Sharma",
-        "receiverId": 102,
-        "receiverName": "Priya Patel",
-        "content": "Hey, I am waiting near the main gate.",
-        "read": true,                  // Automatically marked as read!
-        "createdAt": "2026-08-09T14:45:00"
-      }
-    ],
-    "page": 0,
-    "size": 20,
-    "totalElements": 1,
-    "totalPages": 1,
-    "first": true,
-    "last": true
-  }
+  "pickupName": "Bavdhan Chandani Chowk, Pune",
+  "pickupLat": 18.5089000,
+  "pickupLng": 73.7925000,
+  "dropName": "Wakad Bridge, Pune",
+  "dropLat": 18.5980000,
+  "dropLng": 73.7620000
 }
 
+1.4 POST /api/live-rides/search/start (Booker Start Live Search)
 ----------------------------------------------------------------------------------------------------
-3. WEBSOCKET STOMP /app/chat.send  (REST Fallback: POST /api/chat/send)
-----------------------------------------------------------------------------------------------------
-Description: Sends a chat message to a particular person. ALLOWED ONLY IF sender & receiver have a PRESENT RIDE BOOKED or active application together! Real-time broadcasted over WebSocket & sends FCM push notification.
-
-REQUEST PAYLOAD (JSON Example):
+REQUEST PAYLOAD:
 {
-  "receiverId": 102,                   // Direct user ID, applicant user ID, OR applicationId (e.g. 301)
-  "templateId": 501,                   // Optional: Scheduled ride template ID
-  "content": "Hey, I am waiting near the main gate." // Required: Max 1000 characters
+  "pickupName": "Bavdhan Chandani Chowk, Pune",
+  "pickupLat": 18.5089000,
+  "pickupLng": 73.7925000,
+  "dropName": "Wakad Bridge, Pune",
+  "dropLat": 18.5670000,
+  "dropLng": 73.9140000,
+  "note": "Waiting near bus stop."
 }
 
-REST RESPONSE DTO (JSON Example):
+1.5 POST /api/live-rides/accept (Driver Accept Request)
+----------------------------------------------------------------------------------------------------
+REQUEST PAYLOAD:
 {
-  "success": true,
-  "message": "Message sent.",
-  "data": {
-    "id": 8001,
-    "templateId": 501,
-    "senderId": 101,
-    "senderName": "Rahul Sharma",
-    "receiverId": 102,
-    "receiverName": "Priya Patel",
-    "content": "Hey, I am waiting near the main gate.",
-    "read": false,
-    "createdAt": "2026-08-09T14:45:00"
-  }
+  "searchRequestId": 1005
 }
+
+1.6 POST /api/live-rides/{liveRideId}/verify-otp?otp=4821 (Driver Verify OTP)
+----------------------------------------------------------------------------------------------------
+
+1.7 POST /api/live-rides/{liveRideId}/complete (Driver Complete Live Ride)
+----------------------------------------------------------------------------------------------------
+
+1.8 POST /api/live-rides/{liveRideId}/location (Driver Push GPS Location Ping)
+----------------------------------------------------------------------------------------------------
+REQUEST PAYLOAD:
+{
+  "lat": 18.5089,
+  "lng": 73.7925,
+  "bearingDegrees": 45.0,
+  "speedKmh": 30.0,
+  "timestamp": 1723245000000
+}
+
+1.9 REAL-TIME TRACKING & SAFETY RULES
+----------------------------------------------------------------------------------------------------
+- Driver STOMP Location Push: /app/live-rides/{liveRideId}/location
+- Driver REST Location Push: POST /api/live-rides/{liveRideId}/location (updates Redis key live:live_ride:{liveRideId})
+- Booker STOMP Location Subscribe: /topic/live-rides/{liveRideId}/location (Active during CONFIRMED state)
+- After OTP Verification (VERIFIED state): STOMP broadcast to Booker STOPS. Location pings CONTINUE saving to Redis cache for Admin map and safety monitoring.
+- 1km Drop Radius Auto-Completion: Driver within 1km radius of drop point for 5 minutes -> Auto-completed.
+- Off-Route Warning: Driver >2km off route -> Booker receives FCM alert.
+- Off-Route Auto-Completion: Driver off route for 20 minutes -> Auto-completed.

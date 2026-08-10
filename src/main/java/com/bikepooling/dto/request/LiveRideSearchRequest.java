@@ -11,26 +11,25 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 @NoArgsConstructor
-public class GoLiveRequest {
+public class LiveRideSearchRequest {
 
     @NotBlank
-    private String fromName;
+    private String pickupName;
 
     @NotNull
-    private BigDecimal fromLat;
+    private BigDecimal pickupLat;
 
     @NotNull
-    private BigDecimal fromLng;
+    private BigDecimal pickupLng;
 
     @NotBlank
-    private String toName;
+    private String dropName;
 
     @NotNull
-    private BigDecimal toLat;
+    private BigDecimal dropLat;
 
     @NotNull
-    private BigDecimal toLng;
+    private BigDecimal dropLng;
 
-    private Long vehicleId;
-    private BigDecimal extraDistanceKm;
+    private String note;
 }

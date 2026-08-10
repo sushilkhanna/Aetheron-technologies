@@ -38,6 +38,8 @@ public interface ScheduledRideInstanceRepository extends JpaRepository<Scheduled
 
     Optional<ScheduledRideInstance> findByTemplateIdAndRideDate(Long templateId, LocalDate rideDate);
 
+    List<ScheduledRideInstance> findByTemplateIdAndRideDateIn(Long templateId, Set<LocalDate> dates);
+
     @Query("""
         SELECT i FROM ScheduledRideInstance i
         WHERE i.template.id = :templateId
@@ -168,6 +170,19 @@ public interface ScheduledRideInstanceRepository extends JpaRepository<Scheduled
     @Modifying
     @Query("""
         UPDATE ScheduledRideInstance i
+        SET i.state = com.bikepooling.enums.RideState.CANCELLED, i.cancelledAt = :now
+        WHERE i.template.id = :templateId
+          AND i.rideDate IN :removedDates
+          AND i.state = com.bikepooling.enums.RideState.OPEN
+        """)
+    void cancelOpenInstancesForDates(
+            @Param("templateId") Long templateId,
+            @Param("removedDates") Set<LocalDate> removedDates,
+            @Param("now") LocalDateTime now);
+
+    @Modifying
+    @Query("""
+        UPDATE ScheduledRideInstance i
         SET i.departTime = :departTime, i.extraDistanceKm = :extraDistanceKm
         WHERE i.template.id = :templateId
           AND i.state = com.bikepooling.enums.RideState.OPEN
@@ -176,4 +191,13 @@ public interface ScheduledRideInstanceRepository extends JpaRepository<Scheduled
             @Param("templateId") Long templateId,
             @Param("departTime") LocalTime departTime,
             @Param("extraDistanceKm") BigDecimal extraDistanceKm);
+
+    @Query("""
+        SELECT i FROM ScheduledRideInstance i
+        JOIN FETCH i.template t
+        JOIN FETCH t.postedBy
+        JOIN FETCH t.vehicle
+        WHERE i.state IN (com.bikepooling.enums.RideState.STARTED, com.bikepooling.enums.RideState.VERIFIED, com.bikepooling.enums.RideState.SOS_TRIGGERED)
+        """)
+    List<ScheduledRideInstance> findAllActiveInstances();
 }

@@ -8,9 +8,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface SosRepository extends JpaRepository<SosAlert, Long> {
-    List<SosAlert> findByRide_Id(Long rideId);
+    List<SosAlert> findByInstance_Id(Long instanceId);
 
-    Optional<SosAlert> findByRide_IdAndStatus(Long rideId, SosStatus status);
+    Optional<SosAlert> findByInstance_IdAndStatus(Long instanceId, SosStatus status);
 
     List<SosAlert> findByStatusOrderByTriggeredAtDesc(SosStatus status);
 

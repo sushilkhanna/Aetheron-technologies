@@ -4,6 +4,7 @@ import com.bikepooling.config.OsrmClient;
 import com.bikepooling.dto.request.ApplyScheduledRideRequest;
 import com.bikepooling.dto.response.ScheduledRideApplicantResponse;
 import com.bikepooling.dto.response.ScheduledRideApplicationDayResponse;
+import com.bikepooling.dto.response.ScheduledRideBookerApplicationResponse;
 import com.bikepooling.entity.*;
 import com.bikepooling.enums.ApplicationStatus;
 import com.bikepooling.enums.RideState;
@@ -402,6 +403,16 @@ public class ScheduledRideApplicationService {
 
         return byApplication.values().stream()
                 .map(group -> ScheduledRideApplicantResponse.from(group.get(0).getApplication(), group))
+                .toList();
+    }
+
+    // ── Booker: list my applications with status & OTP ────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<ScheduledRideBookerApplicationResponse> getMyApplications(Long bookerId) {
+        List<ScheduledRideApplication> apps = applicationRepo.findByBookerIdWithDetails(bookerId);
+        return apps.stream()
+                .map(app -> ScheduledRideBookerApplicationResponse.from(app, app.getDays()))
                 .toList();
     }
 

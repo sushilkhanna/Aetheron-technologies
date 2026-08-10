@@ -1,79 +1,101 @@
 package com.bikepooling.controller;
 
 import com.bikepooling.config.UserPrincipal;
-import com.bikepooling.dto.request.LiveSearchRequest;
-import com.bikepooling.enums.RideState;
-import com.bikepooling.exception.AppException;
-import com.bikepooling.repository.RideStatusRepository;
+import com.bikepooling.dto.request.*;
+import com.bikepooling.dto.response.ApiResponse;
+import com.bikepooling.dto.response.LiveRidePreviewResponse;
+import com.bikepooling.dto.response.LiveRideResponse;
 import com.bikepooling.service.LiveRideService;
-import com.bikepooling.service.LiveSearchService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
+@RequestMapping("/api/live-rides")
 @RequiredArgsConstructor
 public class LiveRideController {
 
-    private final LiveRideService    liveRideService;
-    private final LiveSearchService  liveSearchService;
-    private final RideStatusRepository rideStatusRepo;
+    private final LiveRideService liveRideService;
 
-    // ── Driver ────────────────────────────────────────────────────────────────
-
-    /**
-     * Driver taps "Go Live" on an OPEN ride.
-     * Cancels pending applications, transitions OPEN → LIVE.
-     */
-    @PostMapping("/api/rides/{rideId}/live")
-    public ResponseEntity<Void> goLive(
-            @PathVariable Long rideId,
+    @PostMapping("/go-live")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<LiveRideResponse>> goLive(
+            @Valid @RequestBody GoLiveRequest req,
             @AuthenticationPrincipal UserPrincipal principal) {
-
-        liveRideService.goLive(rideId, principal.getUserId());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(
+                "Live mode started.",
+                liveRideService.goLive(principal.getUserId(), req)));
     }
 
-    /**
-     * Driver taps "Go Offline".
-     * Transitions LIVE → OPEN. Blocked if already BOOKED.
-     */
-    @DeleteMapping("/api/rides/{rideId}/live")
-    public ResponseEntity<Void> goOffline(
-            @PathVariable Long rideId,
+    @PostMapping("/stop-live")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> stopLive(
             @AuthenticationPrincipal UserPrincipal principal) {
-
-        // Guard: cannot go offline once a booker is confirmed
-        rideStatusRepo.findByRideId(rideId).ifPresent(status -> {
-            if (status.getState() == RideState.BOOKED) {
-                throw AppException.conflict(
-                        "Cannot go offline after confirming a booker. " +
-                                "Complete or cancel the ride instead.");
-            }
-        });
-
-        liveRideService.goOffline(rideId, principal.getUserId());
-        return ResponseEntity.ok().build();
+        liveRideService.stopLive(principal.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Live mode stopped.", null));
     }
 
-    // ── Booker ────────────────────────────────────────────────────────────────
-
-    @PostMapping("/api/live-search")
-    public ResponseEntity<Void> startSearch(
-            @Valid @RequestBody LiveSearchRequest req,
-            @AuthenticationPrincipal UserPrincipal principal) {
-
-        liveSearchService.startSearch(req, principal.getUserId());
-        return ResponseEntity.accepted().build();
+    @PostMapping("/preview")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<LiveRidePreviewResponse>> previewFare(
+            @Valid @RequestBody LiveRidePreviewRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Fare preview calculated.",
+                liveRideService.previewFare(req)));
     }
 
-    @DeleteMapping("/api/live-search")
-    public ResponseEntity<Void> cancelSearch(
+    @PostMapping("/search/start")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Long>> startSearch(
+            @Valid @RequestBody LiveRideSearchRequest req,
             @AuthenticationPrincipal UserPrincipal principal) {
+        Long searchRequestId = liveRideService.startSearch(principal.getUserId(), req);
+        return ResponseEntity.ok(ApiResponse.ok("Live search started. Notified matching drivers nearby.", searchRequestId));
+    }
 
-        liveSearchService.cancelSearch(principal.getUserId());
-        return ResponseEntity.ok().build();
+    @PostMapping("/accept")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<LiveRideResponse>> acceptRide(
+            @Valid @RequestBody LiveRideAcceptRequest req,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Ride request accepted.",
+                liveRideService.acceptRide(principal.getUserId(), req)));
+    }
+
+    @PostMapping("/{liveRideId}/verify-otp")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<LiveRideResponse>> verifyOtp(
+            @PathVariable Long liveRideId,
+            @RequestParam String otp,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "OTP verified successfully.",
+                liveRideService.verifyOtp(principal.getUserId(), liveRideId, otp)));
+    }
+
+    @PostMapping("/{liveRideId}/complete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<LiveRideResponse>> completeRide(
+            @PathVariable Long liveRideId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Live ride completed.",
+                liveRideService.completeRide(principal.getUserId(), liveRideId)));
+    }
+
+    @GetMapping("/active")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<LiveRideResponse>> getMyActiveRide(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Active live ride fetched.",
+                liveRideService.getMyActiveRide(principal.getUserId())));
     }
 }

@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Set;
@@ -20,8 +19,7 @@ public class ScheduledRideTemplateResponse {
     private String fromName;
     private String toName;
     private LocalTime departTime;
-    private String week;
-    private Set<DayOfWeek> days;
+    private Set<LocalDate> dates;
     private LocalDate weekStart;
     private LocalDate weekEnd;
     private BigDecimal distanceKm;
@@ -38,8 +36,7 @@ public class ScheduledRideTemplateResponse {
                 .fromName(t.getFromName())
                 .toName(t.getToName())
                 .departTime(t.getDepartTime())
-                .week(t.getScheduledWeek().name())
-                .days(t.getDays())
+                .dates(t.getDates())
                 .weekStart(t.getWeekStart())
                 .weekEnd(t.getWeekEnd())
                 .distanceKm(t.getDistanceKm())
@@ -47,7 +44,7 @@ public class ScheduledRideTemplateResponse {
                 .paymentMode(t.getPaymentMode().name())
                 .preferredGender(t.getPreferredGender().name())
                 .routeNotes(t.getRouteNotes())
-                .vehicleNumber(t.getVehicle().getVehicleNumber())
+                .vehicleNumber(t.getVehicle() != null ? t.getVehicle().getVehicleNumber() : null)
                 .status(t.getStatus().name())
                 .build();
     }

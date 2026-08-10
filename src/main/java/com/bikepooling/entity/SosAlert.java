@@ -26,8 +26,8 @@ public class SosAlert {
     private String trackingToken = UUID.randomUUID().toString();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ride_id", nullable = false)
-    private Ride ride;
+    @JoinColumn(name = "instance_id", nullable = false)
+    private ScheduledRideInstance instance;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "triggered_by_user_id", nullable = false)

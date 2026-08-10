@@ -6,6 +6,7 @@ import com.bikepooling.dto.request.ApplyScheduledRideRequest;
 import com.bikepooling.dto.response.ApiResponse;
 import com.bikepooling.dto.response.ScheduledRideApplicantResponse;
 import com.bikepooling.dto.response.ScheduledRideApplicationDayResponse;
+import com.bikepooling.dto.response.ScheduledRideBookerApplicationResponse;
 import com.bikepooling.service.ScheduledRideApplicationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,16 @@ public class ScheduledRideApplicationController {
                 applicationService.listApplicants(templateId, principal.getUserId())));
     }
 
-    // ── Confirmation Endpoints ───────────────────────────────────────────────
+    @GetMapping("/my-applications")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<ScheduledRideBookerApplicationResponse>>> getMyApplications(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "My applications fetched.",
+                applicationService.getMyApplications(principal.getUserId())));
+    }
+
+    // ── Confirmation Endpoint (Driver) ────────────────────────────────────────
 
     @PostMapping("/applications/confirm")
     @PreAuthorize("isAuthenticated()")
@@ -58,16 +68,7 @@ public class ScheduledRideApplicationController {
         return ResponseEntity.ok(ApiResponse.ok("Selected days confirmed.", null));
     }
 
-    @PostMapping("/applications/{applicationDayId}/confirm")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> confirm(
-            @PathVariable Long applicationDayId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        applicationService.confirmDay(applicationDayId, principal.getUserId());
-        return ResponseEntity.ok(ApiResponse.ok("Day confirmed.", null));
-    }
-
-    // ── Rejection Endpoints (Driver) ─────────────────────────────────────────
+    // ── Rejection Endpoint (Driver) ───────────────────────────────────────────
 
     @PostMapping("/applications/reject")
     @PreAuthorize("isAuthenticated()")
@@ -78,16 +79,7 @@ public class ScheduledRideApplicationController {
         return ResponseEntity.ok(ApiResponse.ok("Selected days rejected.", null));
     }
 
-    @PostMapping("/applications/{applicationDayId}/reject")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> reject(
-            @PathVariable Long applicationDayId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        applicationService.rejectDay(applicationDayId, principal.getUserId());
-        return ResponseEntity.ok(ApiResponse.ok("Application rejected.", null));
-    }
-
-    // ── Withdrawal Endpoints (Booker) ────────────────────────────────────────
+    // ── Withdrawal Endpoint (Booker) ──────────────────────────────────────────
 
     @PostMapping("/applications/withdraw")
     @PreAuthorize("isAuthenticated()")
@@ -96,15 +88,6 @@ public class ScheduledRideApplicationController {
             @AuthenticationPrincipal UserPrincipal principal) {
         applicationService.withdrawDays(req.getApplicationDayIds(), principal.getUserId());
         return ResponseEntity.ok(ApiResponse.ok("Selected days withdrawn.", null));
-    }
-
-    @PostMapping("/applications/{applicationDayId}/withdraw")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<Void>> withdraw(
-            @PathVariable Long applicationDayId,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        applicationService.withdrawDay(applicationDayId, principal.getUserId());
-        return ResponseEntity.ok(ApiResponse.ok("Application withdrawn.", null));
     }
 
     // ── Instance Lifecycle Endpoints ──────────────────────────────────────────

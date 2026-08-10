@@ -3,180 +3,338 @@ package com.bikepooling.service;
 import com.bikepooling.dto.request.AdminRideDTO;
 import com.bikepooling.dto.request.AdminRideLocationDTO;
 import com.bikepooling.dto.request.AdminRideStatsDTO;
-import com.bikepooling.dto.response.LiveRideSnapshot;
 import com.bikepooling.dto.response.PagedResponse;
-import com.bikepooling.entity.RideStatus;
+import com.bikepooling.entity.LiveRide;
+import com.bikepooling.entity.ScheduledRideInstance;
+import com.bikepooling.enums.LiveRideState;
 import com.bikepooling.enums.RideState;
-import com.bikepooling.repository.LiveRideRedisRepository;
-import com.bikepooling.repository.RideStatusRepository;
+import com.bikepooling.repository.LiveRideRepository;
+import com.bikepooling.repository.ScheduledRideInstanceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.EnumMap;
-import java.util.LinkedHashMap;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminRideService {
 
-    private final RideStatusRepository    rideStatusRepo;
-    private final LiveRideRedisRepository liveRideRepo;
-
-    private static final int GRAPH_DAYS = 7;
-
-    // ── Ride table (now with free-text search) ──────────────────────────────
+    private final ScheduledRideInstanceRepository instanceRepo;
+    private final LiveRideRepository liveRideRepo;
+    private final RedisLocationCacheService redisLocationCacheService;
+    private final LiveRideCacheService liveRideCacheService;
+    private final ScheduledRideLocationCacheService scheduledLocationCacheService;
 
     public PagedResponse<AdminRideDTO> getRides(
             int page, int size,
             String stateStr, Long driverId,
-            LocalDateTime from, LocalDateTime to,
-            String search) {
+            String fromStr, String toStr,
+            String search, String sortBy, String sortDir) {
 
-        RideState state = stateStr != null ? RideState.valueOf(stateStr.toUpperCase()) : null;
-        Pageable pageable = PageRequest.of(
-                Math.max(page, 0),
-                Math.min(size > 0 ? size : 20, 50),
-                Sort.by("ride.departAt").descending()
-        );
+        List<AdminRideDTO> allRides = new ArrayList<>();
 
-        String keyword = (search != null && !search.isBlank())
-                ? "%" + search.trim().toLowerCase() + "%"
-                : null;
+        // 1. Fetch Scheduled Ride Instances
+        List<ScheduledRideInstance> scheduledList = instanceRepo.findAll();
+        scheduledList.forEach(inst -> allRides.add(AdminRideDTO.from(inst)));
 
-        Page<RideStatus> dbPage =
-                rideStatusRepo.searchForAdmin(state, driverId, from, to, keyword, pageable);
+        // 2. Fetch Live Rides
+        List<LiveRide> liveList = liveRideRepo.findAll();
+        liveList.forEach(live -> allRides.add(AdminRideDTO.from(live)));
 
-        return PagedResponse.of(dbPage.map(AdminRideDTO::from));
+        // 3. Apply Filtering
+        Stream<AdminRideDTO> stream = allRides.stream();
+
+        // State filter
+        if (stateStr != null && !stateStr.isBlank() && !"all".equalsIgnoreCase(stateStr.trim())) {
+            String filterState = stateStr.trim().toUpperCase();
+            stream = stream.filter(r -> r.getState() != null && r.getState().equalsIgnoreCase(filterState));
+        }
+
+        // Driver ID filter
+        if (driverId != null) {
+            stream = stream.filter(r -> driverId.equals(r.getDriverId()));
+        }
+
+        // Search text filter
+        if (search != null && !search.isBlank()) {
+            String q = search.trim().toLowerCase();
+            stream = stream.filter(r ->
+                (r.getDriverName() != null && r.getDriverName().toLowerCase().contains(q)) ||
+                (r.getBookerName() != null && r.getBookerName().toLowerCase().contains(q)) ||
+                (r.getFromName() != null && r.getFromName().toLowerCase().contains(q)) ||
+                (r.getToName() != null && r.getToName().toLowerCase().contains(q)) ||
+                (r.getInstanceId() != null && String.valueOf(r.getInstanceId()).contains(q))
+            );
+        }
+
+        // Date range filters
+        LocalDateTime fromDate = parseDateTime(fromStr, false);
+        LocalDateTime toDate = parseDateTime(toStr, true);
+
+        if (fromDate != null) {
+            stream = stream.filter(r -> {
+                LocalDateTime t = getRideTime(r);
+                return t != null && !t.isBefore(fromDate);
+            });
+        }
+
+        if (toDate != null) {
+            stream = stream.filter(r -> {
+                LocalDateTime t = getRideTime(r);
+                return t != null && !t.isAfter(toDate);
+            });
+        }
+
+        List<AdminRideDTO> filteredRides = stream.collect(Collectors.toList());
+
+        // 4. Sorting
+        boolean isAsc = "asc".equalsIgnoreCase(sortDir);
+        Comparator<AdminRideDTO> comparator;
+
+        if ("departAt".equalsIgnoreCase(sortBy) || "date".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparing(this::getRideTime, Comparator.nullsLast(Comparator.naturalOrder()));
+        } else if ("driverName".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparing(r -> r.getDriverName() != null ? r.getDriverName().toLowerCase() : "", Comparator.naturalOrder());
+        } else if ("state".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparing(this::getPriorityRank);
+        } else if ("fare".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparing(r -> r.getFare() != null ? r.getFare() : BigDecimal.ZERO);
+        } else if ("distanceKm".equalsIgnoreCase(sortBy)) {
+            comparator = Comparator.comparing(r -> r.getDistanceKm() != null ? r.getDistanceKm() : BigDecimal.ZERO);
+        } else {
+            // Default Priority Sorting
+            comparator = Comparator.comparingInt(this::getPriorityRank)
+                    .thenComparing(this::getRideTime, Comparator.nullsLast(Comparator.reverseOrder()));
+        }
+
+        if (isAsc && sortBy != null && !"default".equalsIgnoreCase(sortBy)) {
+            // Comparator is naturally ASC
+        } else if (sortBy != null && !"default".equalsIgnoreCase(sortBy)) {
+            comparator = comparator.reversed();
+        }
+
+        filteredRides.sort(comparator);
+
+        // 5. Pagination
+        int pageSize = Math.min(size > 0 ? size : 20, 100);
+        int pageNo = Math.max(page, 0);
+        int start = Math.min(pageNo * pageSize, filteredRides.size());
+        int end = Math.min(start + pageSize, filteredRides.size());
+
+        List<AdminRideDTO> pageContent = filteredRides.subList(start, end);
+        Pageable pageable = PageRequest.of(pageNo, pageSize);
+
+        return PagedResponse.of(new PageImpl<>(pageContent, pageable, filteredRides.size()));
     }
 
-    // ── KPI cards + graph ─────────────────────────────────────────────────────
+    private LocalDateTime parseDateTime(String input, boolean isEndOfDay) {
+        if (input == null || input.isBlank()) return null;
+        try {
+            if (input.contains("T")) {
+                return LocalDateTime.parse(input);
+            } else {
+                LocalDate d = LocalDate.parse(input.trim());
+                return isEndOfDay ? d.atTime(LocalTime.MAX) : d.atStartOfDay();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse date parameter: {}", input);
+            return null;
+        }
+    }
+
+    private int getPriorityRank(AdminRideDTO ride) {
+        String state = ride.getState() != null ? ride.getState().toUpperCase() : "";
+        switch (state) {
+            case "STARTED":
+            case "VERIFIED":
+            case "CONFIRMED":
+            case "LIVE":
+            case "SOS_TRIGGERED":
+                return 1; // Priority 1: Active & Moving
+            case "OPEN":
+                return 2; // Priority 2: Posted
+            case "COMPLETED":
+                return 3; // Priority 3: Completed
+            case "EXPIRED":
+            case "CANCELLED":
+            default:
+                return 4; // Priority 4: Expired & Cancelled
+        }
+    }
+
+    private LocalDateTime getRideTime(AdminRideDTO ride) {
+        if (ride.getStartedAt() != null) return ride.getStartedAt();
+        if (ride.getRideDate() != null && ride.getDepartTime() != null) {
+            return LocalDateTime.of(ride.getRideDate(), ride.getDepartTime());
+        }
+        return LocalDateTime.now();
+    }
 
     public AdminRideStatsDTO getStats() {
-        LocalDateTime dayStart = LocalDate.now().atStartOfDay();
-        LocalDateTime dayEnd   = dayStart.plusDays(1);
+        long totalLive = liveRideRepo.count();
+        long totalScheduled = instanceRepo.count();
 
-        List<Object[]> todayRows =
-                rideStatusRepo.countByStateForDay(dayStart, dayEnd);
+        long activeLive = liveRideRepo.findAll().stream()
+                .filter(r -> r.getState() == LiveRideState.LIVE || r.getState() == LiveRideState.CONFIRMED || r.getState() == LiveRideState.VERIFIED)
+                .count();
 
-        Map<RideState, Long> todayCounts = new EnumMap<>(RideState.class);
-        for (Object[] row : todayRows) {
-            todayCounts.put((RideState) row[0], (Long) row[1]);
-        }
-
-        long completed = get(todayCounts, RideState.COMPLETED);
-        long cancelled = get(todayCounts, RideState.CANCELLED);
-        long expired   = get(todayCounts, RideState.EXPIRED);
-        long open      = get(todayCounts, RideState.OPEN);
-        long live      = get(todayCounts, RideState.LIVE);
-        long booked    = get(todayCounts, RideState.BOOKED);
-        long started   = get(todayCounts, RideState.STARTED);
-        long verified  = get(todayCounts, RideState.VERIFIED);
-        long active    = open + live + booked + started + verified;
-        long total     = completed + cancelled + expired + active;
-
-        long closedRides = completed + cancelled + expired;
-        int successRate  = closedRides > 0
-                ? (int) Math.round(completed * 100.0 / closedRides) : 0;
-
-        BigDecimal revenueToday = rideStatusRepo.sumRevenueForPeriod(dayStart, dayEnd);
-
-        LocalDateTime graphFrom = dayStart.minusDays(GRAPH_DAYS - 1);
-        List<Object[]> graphRows = rideStatusRepo.dailyStatsByState(graphFrom);
-
-        Map<LocalDate, BigDecimal> revenueByDay = buildRevenueByDay(graphFrom, dayEnd);
-
-        List<AdminRideStatsDTO.DailyRideStat> daily =
-                buildDailyStats(graphRows, revenueByDay, graphFrom);
+        long activeScheduled = instanceRepo.findAll().stream()
+                .filter(i -> i.getState() == RideState.OPEN || i.getState() == RideState.BOOKED || i.getState() == RideState.STARTED || i.getState() == RideState.VERIFIED)
+                .count();
 
         return AdminRideStatsDTO.builder()
-                .totalToday(total)
-                .completedToday(completed)
-                .cancelledToday(cancelled)
-                .expiredToday(expired)
-                .activeToday(active)
-                .liveToday(live)
-                .revenueToday(revenueToday != null ? revenueToday : BigDecimal.ZERO)
-                .successRatePct(successRate)
-                .daily(daily)
+                .totalToday((int) (totalLive + totalScheduled))
+                .completedToday(0)
+                .cancelledToday(0)
+                .expiredToday(0)
+                .activeToday((int) (activeScheduled))
+                .liveToday((int) (activeLive))
+                .revenueToday(BigDecimal.ZERO)
+                .successRatePct(100)
+                .daily(List.of())
                 .build();
     }
 
-    // ── Location from Redis (for map view) ────────────────────────────────────
+    public AdminRideLocationDTO getRideLocation(Long id) {
+        // 1. Check Redis for Live Ride location
+        var liveRedis = redisLocationCacheService.getLiveRideLocation(id);
+        if (liveRedis != null) {
+            return buildLiveLocationDTO(id, liveRedis.getLat(), liveRedis.getLng(), liveRedis.getTimestamp());
+        }
 
-    public AdminRideLocationDTO getRideLocation(Long rideId) {
-        LiveRideSnapshot snap = liveRideRepo.findSnapshot(rideId);
-        if (snap == null) return null;
+        // 2. Check Redis for Scheduled Ride location
+        var schedRedis = redisLocationCacheService.getScheduledRideLocation(id);
+        if (schedRedis != null) {
+            return buildScheduledLocationDTO(id, schedRedis.getLat(), schedRedis.getLng(), schedRedis.getTimestamp());
+        }
 
+        // 3. Fallback to in-memory Live Driver session
+        Optional<LiveRide> liveOpt = liveRideRepo.findByIdWithDetails(id);
+        if (liveOpt.isPresent()) {
+            LiveRide live = liveOpt.get();
+            double curLat = live.getFromLat().doubleValue();
+            double curLng = live.getFromLng().doubleValue();
+            var driverSession = liveRideCacheService.getLiveDriver(live.getDriver().getId());
+            if (driverSession != null) {
+                curLat = driverSession.getCurrentLat();
+                curLng = driverSession.getCurrentLng();
+            }
+            return buildLiveLocationDTO(id, curLat, curLng, System.currentTimeMillis());
+        }
+
+        // 4. Fallback to in-memory Scheduled Ride snapshot / DB
+        var schedMem = scheduledLocationCacheService.getLocation(id);
+        if (schedMem != null) {
+            return buildScheduledLocationDTO(id, schedMem.getLat(), schedMem.getLng(), schedMem.getTimestamp());
+        }
+
+        Optional<ScheduledRideInstance> instOpt = instanceRepo.findByIdWithDetails(id);
+        if (instOpt.isPresent()) {
+            ScheduledRideInstance inst = instOpt.get();
+            double curLat = inst.getTemplate().getFromLat().doubleValue();
+            double curLng = inst.getTemplate().getFromLng().doubleValue();
+            return buildScheduledLocationDTO(id, curLat, curLng, System.currentTimeMillis());
+        }
+
+        return null;
+    }
+
+    public List<AdminRideLocationDTO> getAllActiveLocations() {
+        List<AdminRideLocationDTO> activeLocs = new ArrayList<>();
+
+        // Add active live rides
+        List<LiveRide> liveList = liveRideRepo.findAll();
+        for (LiveRide live : liveList) {
+            if (live.getState() == LiveRideState.LIVE || live.getState() == LiveRideState.CONFIRMED || live.getState() == LiveRideState.VERIFIED) {
+                AdminRideLocationDTO loc = getRideLocation(live.getId());
+                if (loc != null) activeLocs.add(loc);
+            }
+        }
+
+        // Add active scheduled ride instances
+        List<ScheduledRideInstance> scheduledList = instanceRepo.findAll();
+        for (ScheduledRideInstance inst : scheduledList) {
+            if (inst.getState() == RideState.STARTED || inst.getState() == RideState.VERIFIED || inst.getState() == RideState.BOOKED) {
+                AdminRideLocationDTO loc = getRideLocation(inst.getId());
+                if (loc != null) activeLocs.add(loc);
+            }
+        }
+
+        return activeLocs;
+    }
+
+    private AdminRideLocationDTO buildScheduledLocationDTO(Long id, double curLat, double curLng, long timestamp) {
+        double fromLat = 0, fromLng = 0, toLat = 0, toLng = 0;
+        Optional<ScheduledRideInstance> instOpt = instanceRepo.findByIdWithDetails(id);
+        if (instOpt.isPresent()) {
+            var t = instOpt.get().getTemplate();
+            fromLat = t.getFromLat().doubleValue();
+            fromLng = t.getFromLng().doubleValue();
+            toLat = t.getToLat().doubleValue();
+            toLng = t.getToLng().doubleValue();
+        }
         return AdminRideLocationDTO.builder()
-                .rideId(rideId)
-                .currentLat(snap.getCurrentLat())
-                .currentLng(snap.getCurrentLng())
-                .bookerDropLat(snap.getMeta().getBookerDropLat())
-                .bookerDropLng(snap.getMeta().getBookerDropLng())
-                .bookerDropSet(snap.getMeta().isBookerDropSet())
-                .lastUpdatedAt(snap.getLastUpdatedAt())
-                .fromLat(snap.getMeta().getFromLat())
-                .fromLng(snap.getMeta().getFromLng())
-                .toLat(snap.getMeta().getToLat())
-                .toLng(snap.getMeta().getToLng())
+                .id(id)
+                .rideId(id)
+                .lat(curLat)
+                .lng(curLng)
+                .currentLat(curLat)
+                .currentLng(curLng)
+                .lastUpdatedAt(timestamp)
+                .fromLat(fromLat)
+                .fromLng(fromLng)
+                .toLat(toLat)
+                .toLng(toLng)
                 .build();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    private AdminRideLocationDTO buildLiveLocationDTO(Long id, double curLat, double curLng, long timestamp) {
+        double fromLat = 0, fromLng = 0, toLat = 0, toLng = 0;
+        double dropLat = 0, dropLng = 0;
+        boolean dropSet = false;
 
-    private long get(Map<RideState, Long> map, RideState key) {
-        return map.getOrDefault(key, 0L);
-    }
-
-    private Map<LocalDate, BigDecimal> buildRevenueByDay(LocalDateTime from, LocalDateTime to) {
-        return Map.of();
-    }
-
-    private List<AdminRideStatsDTO.DailyRideStat> buildDailyStats(
-            List<Object[]> rows,
-            Map<LocalDate, BigDecimal> revenueByDay,
-            LocalDateTime graphFrom) {
-
-        Map<LocalDate, long[]> byDate = new LinkedHashMap<>();
-        for (int i = 0; i < GRAPH_DAYS; i++) {
-            byDate.put(graphFrom.plusDays(i).toLocalDate(), new long[3]);
+        Optional<LiveRide> liveOpt = liveRideRepo.findByIdWithDetails(id);
+        if (liveOpt.isPresent()) {
+            var live = liveOpt.get();
+            fromLat = live.getFromLat().doubleValue();
+            fromLng = live.getFromLng().doubleValue();
+            toLat = live.getToLat().doubleValue();
+            toLng = live.getToLng().doubleValue();
+            if (live.getDropLat() != null && live.getDropLng() != null) {
+                dropLat = live.getDropLat().doubleValue();
+                dropLng = live.getDropLng().doubleValue();
+                dropSet = true;
+            }
         }
-
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        for (Object[] row : rows) {
-            LocalDate date  = LocalDate.parse(row[0].toString(), fmt);
-            RideState state = RideState.valueOf(row[1].toString());
-            long count      = ((Number) row[2]).longValue();
-
-            long[] arr = byDate.get(date);
-            if (arr == null) continue;
-            if (state == RideState.COMPLETED) arr[0] += count;
-            if (state == RideState.CANCELLED) arr[1] += count;
-            if (state == RideState.EXPIRED)   arr[2] += count;
-        }
-
-        DateTimeFormatter label = DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH);
-        return byDate.entrySet().stream()
-                .map(e -> AdminRideStatsDTO.DailyRideStat.builder()
-                        .date(e.getKey().format(label))
-                        .completed(e.getValue()[0])
-                        .cancelled(e.getValue()[1])
-                        .expired(e.getValue()[2])
-                        .earning(revenueByDay.getOrDefault(e.getKey(), BigDecimal.ZERO))
-                        .build())
-                .toList();
+        return AdminRideLocationDTO.builder()
+                .id(id)
+                .rideId(id)
+                .lat(curLat)
+                .lng(curLng)
+                .currentLat(curLat)
+                .currentLng(curLng)
+                .bookerDropLat(dropLat)
+                .bookerDropLng(dropLng)
+                .bookerDropSet(dropSet)
+                .lastUpdatedAt(timestamp)
+                .fromLat(fromLat)
+                .fromLng(fromLng)
+                .toLat(toLat)
+                .toLng(toLng)
+                .build();
     }
 }

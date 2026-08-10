@@ -54,24 +54,8 @@ public class ScheduledRideService {
             throw AppException.forbidden("Driving licence verification is required to post a ride.");
         }
 
-        LocalDate today        = LocalDate.now();
-        LocalDate thisWeekEnd  = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY));
-
-        LocalDate weekStart;
-        LocalDate weekEnd;
-        if (req.getWeek() == ScheduleWeek.CURRENT) {
-            // Today → Saturday this week. If today IS Saturday, this is just today — single day.
-            weekStart = today;
-            weekEnd   = thisWeekEnd;
-        } else {
-            // Full clean 7-day block: Sunday after this week's Saturday → the Saturday after that.
-            // Entirely in the future regardless of what day "today" is — this is what lets a driver
-            // posting on a Saturday still get a full week to choose from, without mixing weeks.
-            weekStart = thisWeekEnd.plusDays(1);
-            weekEnd   = weekStart.plusDays(6);
-        }
-
-        validateDays(req.getDays());
+        Set<LocalDate> dates = req.getDates();
+        validateDates(dates);
 
         double roadKm = osrmClient.getRoadDistanceKm(
                 req.getFromLat().doubleValue(), req.getFromLng().doubleValue(),
@@ -98,6 +82,9 @@ public class ScheduledRideService {
         BigDecimal fare       = calculateFare(distanceKm);
         PreferredGender gender = resolveGenderPreference(req.getPreferredGender(), driver);
 
+        LocalDate weekStart = dates.stream().min(LocalDate::compareTo).orElse(LocalDate.now());
+        LocalDate weekEnd   = dates.stream().max(LocalDate::compareTo).orElse(LocalDate.now());
+
         ScheduledRideTemplate template = ScheduledRideTemplate.builder()
                 .postedBy(driver)
                 .vehicle(vehicle)
@@ -114,8 +101,7 @@ public class ScheduledRideService {
                 .paymentMode(req.getPaymentMode())
                 .preferredGender(gender)
                 .routeNotes(req.getRouteNotes())
-                .days(req.getDays())
-                .scheduledWeek(req.getWeek())
+                .dates(dates)
                 .weekStart(weekStart)
                 .weekEnd(weekEnd)
                 .status(ScheduledRideStatus.ACTIVE)
@@ -123,15 +109,15 @@ public class ScheduledRideService {
                 .build();
 
         template = templateRepo.save(template);
-        generateInstances(template, weekStart, weekEnd, req.getDays());
+        generateInstancesForDates(template, dates);
 
-        log.info("Scheduled ride posted: templateId={} driverId={} week={} range=[{},{}] days={}",
-                template.getId(), userId, req.getWeek(), weekStart, weekEnd, req.getDays());
+        log.info("Scheduled ride posted: templateId={} driverId={} dates={}",
+                template.getId(), userId, dates);
 
         return ScheduledRideTemplateResponse.from(template);
     }
 
-    // ── Update (days / time / extraKm — never location, never the week block) ──
+    // ── Update ──
 
     @Transactional
     public ScheduledRideTemplateResponse updateScheduledRide(
@@ -147,50 +133,47 @@ public class ScheduledRideService {
             throw AppException.conflict("This scheduled ride has been cancelled.");
         }
 
-        LocalDate today = LocalDate.now();
-        // Never generate instances for dates already passed within the template's own window.
-        LocalDate effectiveStart = today.isAfter(template.getWeekStart())
-                ? today : template.getWeekStart();
+        if (req.getDates() != null && !req.getDates().isEmpty()) {
+            validateDates(req.getDates());
 
-        if (req.getDays() != null && !req.getDays().isEmpty()) {
-            validateDays(req.getDays());
+            Set<LocalDate> oldDates = new HashSet<>(template.getDates());
+            Set<LocalDate> newDates = req.getDates();
 
-            Set<DayOfWeek> oldDays = new HashSet<>(template.getDays());
-            Set<DayOfWeek> newDays = req.getDays();
+            Set<LocalDate> removed = new HashSet<>(oldDates);
+            removed.removeAll(newDates);
+            Set<LocalDate> added = new HashSet<>(newDates);
+            added.removeAll(oldDates);
 
-            Set<DayOfWeek> removed = new HashSet<>(oldDays);
-            removed.removeAll(newDays);
-            Set<DayOfWeek> added = new HashSet<>(newDays);
-            added.removeAll(oldDays);
-
+            // Guard: Only OPEN instances can be removed or modified!
             if (!removed.isEmpty()) {
-                instanceRepo.cancelOpenInstancesForDays(templateId, removed, LocalDateTime.now());
-                log.info("Removed days cancelled OPEN instances: templateId={} days={}", templateId, removed);
+                List<ScheduledRideInstance> removedInstances = instanceRepo.findByTemplateIdAndRideDateIn(templateId, removed);
+                for (ScheduledRideInstance inst : removedInstances) {
+                    if (inst.getState() != RideState.OPEN) {
+                        throw AppException.conflict("Date " + inst.getRideDate()
+                                + " cannot be removed or modified because its ride status is " + inst.getState() + ".");
+                    }
+                }
+
+                instanceRepo.cancelOpenInstancesForDates(templateId, removed, LocalDateTime.now());
+                log.info("Removed OPEN dates cancelled: templateId={} dates={}", templateId, removed);
             }
 
-            template.setDays(newDays);
+            template.setDates(newDates);
+            template.setWeekStart(newDates.stream().min(LocalDate::compareTo).orElse(LocalDate.now()));
+            template.setWeekEnd(newDates.stream().max(LocalDate::compareTo).orElse(LocalDate.now()));
             templateRepo.save(template);
 
             if (!added.isEmpty()) {
-                generateInstances(template, effectiveStart, template.getWeekEnd(), added);
-                log.info("New days generated instances: templateId={} days={}", templateId, added);
+                generateInstancesForDates(template, added);
+                log.info("New dates generated instances: templateId={} dates={}", templateId, added);
             }
         }
 
-        boolean timeChanged  = req.getDepartTime() != null;
-        boolean extraChanged = req.getExtraDistanceKm() != null;
-
-        if (timeChanged || extraChanged) {
-            LocalTime newTime   = timeChanged  ? req.getDepartTime()      : template.getDepartTime();
-            BigDecimal newExtra = extraChanged ? req.getExtraDistanceKm() : template.getExtraDistanceKm();
-
-            template.setDepartTime(newTime);
-            template.setExtraDistanceKm(newExtra);
+        if (req.getExtraDistanceKm() != null) {
+            template.setExtraDistanceKm(req.getExtraDistanceKm());
             templateRepo.save(template);
-
-            instanceRepo.refreshOpenInstances(templateId, newTime, newExtra);
-            log.info("Template time/extraKm updated, propagated to OPEN instances only: templateId={}",
-                    templateId);
+            instanceRepo.refreshOpenInstances(templateId, template.getDepartTime(), req.getExtraDistanceKm());
+            log.info("Template extraKm updated, propagated to OPEN instances: templateId={}", templateId);
         }
 
         return ScheduledRideTemplateResponse.from(template);
@@ -273,34 +256,40 @@ public class ScheduledRideService {
 
     // ── Instance generation ──────────────────────────────────────────────────────
 
-    private void generateInstances(ScheduledRideTemplate template,
-                                   LocalDate from, LocalDate to,
-                                   Set<DayOfWeek> daysToGenerate) {
-        LocalDate cursor = from;
-        while (!cursor.isAfter(to)) {
-            if (daysToGenerate.contains(cursor.getDayOfWeek())) {
-                boolean exists = instanceRepo.findByTemplateIdAndRideDate(
-                        template.getId(), cursor).isPresent();
-                if (!exists) {
-                    instanceRepo.save(ScheduledRideInstance.builder()
-                            .template(template)
-                            .rideDate(cursor)
-                            .dayOfWeek(cursor.getDayOfWeek())
-                            .departTime(template.getDepartTime())
-                            .extraDistanceKm(template.getExtraDistanceKm())
-                            .state(RideState.OPEN)
-                            .build());
-                }
+    private void generateInstancesForDates(ScheduledRideTemplate template, Set<LocalDate> dates) {
+        for (LocalDate date : dates) {
+            boolean exists = instanceRepo.findByTemplateIdAndRideDate(
+                    template.getId(), date).isPresent();
+            if (!exists) {
+                instanceRepo.save(ScheduledRideInstance.builder()
+                        .template(template)
+                        .rideDate(date)
+                        .dayOfWeek(date.getDayOfWeek())
+                        .departTime(template.getDepartTime())
+                        .extraDistanceKm(template.getExtraDistanceKm())
+                        .state(RideState.OPEN)
+                        .build());
             }
-            cursor = cursor.plusDays(1);
         }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private void validateDays(Set<DayOfWeek> days) {
-        if (days.isEmpty()) {
-            throw AppException.badRequest("Select at least one day.");
+    private void validateDates(Set<LocalDate> dates) {
+        if (dates == null || dates.isEmpty()) {
+            throw AppException.badRequest("Select at least one date.");
+        }
+        LocalDate today = LocalDate.now();
+        LocalDate maxAllowedDate = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(7);
+
+        for (LocalDate date : dates) {
+            if (date.isBefore(today)) {
+                throw AppException.badRequest("Date " + date + " cannot be in the past.");
+            }
+            if (date.isAfter(maxAllowedDate)) {
+                throw AppException.badRequest("Date " + date + " is beyond next week (" + maxAllowedDate
+                        + "). Drivers can only post for current and next week.");
+            }
         }
     }
 

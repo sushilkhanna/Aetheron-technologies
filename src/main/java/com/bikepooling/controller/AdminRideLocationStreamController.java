@@ -17,15 +17,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Push-based location feed for the admin live-ride map — avoids the
- * setInterval-throttled-in-background-tab problem that plain polling hits.
- *
- * If the map still freezes with this endpoint, it's confirmed NOT a
- * frontend-polling issue: check LOCATION_TTL (5 min) — a driver whose app
- * stopped sending pings will show a static dot for up to 5 minutes before
- * disappearing, by design, not a bug.
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/rides")
@@ -48,10 +39,12 @@ public class AdminRideLocationStreamController {
             if (stopped.get()) return;
             try {
                 AdminRideLocationDTO loc = adminRideService.getRideLocation(rideId);
-                emitter.send(SseEmitter.event().name("location").data(loc, MediaType.APPLICATION_JSON));
+                if (loc != null) {
+                    emitter.send(SseEmitter.event().data(loc, MediaType.APPLICATION_JSON));
+                }
             } catch (IOException e) {
                 if (!stopped.getAndSet(true)) {
-                    log.debug("SSE client disconnected: rideId={}", rideId);
+                    log.debug("SSE client disconnected for rideId={}", rideId);
                     emitter.complete();
                     raw.shutdown();
                 }

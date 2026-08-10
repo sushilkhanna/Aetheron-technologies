@@ -11,6 +11,8 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -25,8 +27,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
         if (accessor == null) return message;
 
-        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+        Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
 
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String header = accessor.getFirstNativeHeader("Authorization");
             if (header == null || !header.startsWith("Bearer ")) {
                 throw new IllegalArgumentException("Missing or invalid Authorization header.");
@@ -39,6 +42,16 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
             Long userId = jwtUtil.extractUserId(token);
             accessor.setUser(() -> String.valueOf(userId));
+            if (sessionAttributes != null) {
+                sessionAttributes.put("userId", userId);
+            }
+            log.info("WebSocket STOMP connected for userId={}", userId);
+        } else {
+            // Restore Principal on subsequent frames (SEND, SUBSCRIBE, etc.) if needed
+            if (accessor.getUser() == null && sessionAttributes != null && sessionAttributes.containsKey("userId")) {
+                Long userId = (Long) sessionAttributes.get("userId");
+                accessor.setUser(() -> String.valueOf(userId));
+            }
         }
 
         return message;

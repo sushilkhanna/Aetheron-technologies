@@ -7,18 +7,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
-import java.time.LocalTime;
+import java.time.LocalDate;
 import java.util.Set;
 
-/** All fields optional — only supplied ones are updated. Location is never editable. */
+/** Driver can update dates (only OPEN instances can be modified/removed) and optional extra distance. Time editing is not allowed. */
 @Getter
 @Setter
 @NoArgsConstructor
 public class UpdateScheduledRideRequest {
 
-    private Set<DayOfWeek> days;
-    private LocalTime departTime;
+    private Set<LocalDate> dates;
 
     @DecimalMin("0.0") @DecimalMax("50.0")
     private BigDecimal extraDistanceKm;

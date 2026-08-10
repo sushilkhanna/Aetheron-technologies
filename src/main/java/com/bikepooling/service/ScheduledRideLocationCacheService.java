@@ -27,13 +27,21 @@ public class ScheduledRideLocationCacheService {
         // Auto-completion & safety monitoring state
         private Long nearDropPointStartTime;
         private Long offRouteStartTime;
+        private Long passedDestinationStartTime;
         private boolean offRouteAlertSent;
+
+        // Stationary / Idle monitoring state
+        private Long stationaryStartTime;
+        private Double stationaryLat;
+        private Double stationaryLng;
     }
 
     private final Map<Long, RideLocationSnapshot> cache = new ConcurrentHashMap<>();
 
     public void updateLocation(Long instanceId, double lat, double lng, Double bearingDegrees, Double speedKmh, long timestamp, Long driverId) {
         cache.compute(instanceId, (id, existing) -> {
+            long now = System.currentTimeMillis();
+            long updateTs = timestamp > 0 ? timestamp : now;
             if (existing == null) {
                 return RideLocationSnapshot.builder()
                         .instanceId(instanceId)
@@ -42,14 +50,33 @@ public class ScheduledRideLocationCacheService {
                         .lng(lng)
                         .bearingDegrees(bearingDegrees)
                         .speedKmh(speedKmh)
-                        .timestamp(timestamp)
+                        .timestamp(updateTs)
+                        .stationaryLat(lat)
+                        .stationaryLng(lng)
+                        .stationaryStartTime(now)
                         .build();
             } else {
+                double prevLat = existing.getLat();
+                double prevLng = existing.getLng();
+                double distKm = com.bikepooling.util.GeoUtil.distanceKm(prevLat, prevLng, lat, lng);
+
+                if (distKm <= 0.05) { // Within 50 meters
+                    if (existing.getStationaryStartTime() == null) {
+                        existing.setStationaryStartTime(now);
+                        existing.setStationaryLat(lat);
+                        existing.setStationaryLng(lng);
+                    }
+                } else {
+                    existing.setStationaryStartTime(now);
+                    existing.setStationaryLat(lat);
+                    existing.setStationaryLng(lng);
+                }
+
                 existing.setLat(lat);
                 existing.setLng(lng);
                 existing.setBearingDegrees(bearingDegrees);
                 existing.setSpeedKmh(speedKmh);
-                existing.setTimestamp(timestamp);
+                existing.setTimestamp(updateTs);
                 if (driverId != null) {
                     existing.setDriverId(driverId);
                 }
