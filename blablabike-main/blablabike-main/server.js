@@ -26,6 +26,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 BlaBlaBike Express server running on port ${PORT}`);
+  console.log(`🚀 BikePooling Express server running on port ${PORT}`);
   console.log(`ℹ️  Auth & data served by Java backend on port 8080`);
 });

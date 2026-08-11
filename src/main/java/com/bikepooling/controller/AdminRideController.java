@@ -3,9 +3,12 @@ package com.bikepooling.controller;
 import com.bikepooling.dto.request.AdminRideDTO;
 import com.bikepooling.dto.request.AdminRideLocationDTO;
 import com.bikepooling.dto.request.AdminRideStatsDTO;
+import com.bikepooling.dto.request.SendRideNotificationRequest;
+import com.bikepooling.dto.response.AdminMessageResponse;
 import com.bikepooling.dto.response.ApiResponse;
 import com.bikepooling.dto.response.PagedResponse;
 import com.bikepooling.service.AdminRideService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -65,5 +68,14 @@ public class AdminRideController {
     public ResponseEntity<ApiResponse<List<AdminRideLocationDTO>>> getAllActiveLocations() {
         return ResponseEntity.ok(ApiResponse.ok("Active ride locations fetched",
                 adminRideService.getAllActiveLocations()));
+    }
+
+    @PostMapping("/send-notification")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AdminMessageResponse>> sendRideNotification(
+            @RequestBody @Valid SendRideNotificationRequest request) {
+
+        return ResponseEntity.ok(ApiResponse.ok("Ride notifications processed",
+                adminRideService.sendRideNotification(request)));
     }
 }

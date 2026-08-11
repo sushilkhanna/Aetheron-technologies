@@ -176,9 +176,10 @@ public class LiveRideService {
 
     @Transactional
     public LiveRideResponse acceptRide(Long driverId, LiveRideAcceptRequest req) {
-        var searchReq = cacheService.getSearchRequest(req.getSearchRequestId());
+        // Atomically claim search request to prevent concurrent drivers from accepting the same request
+        var searchReq = cacheService.claimSearchRequest(req.getSearchRequestId());
         if (searchReq == null) {
-            throw AppException.notFound("Live ride search request expired or no longer available.");
+            throw AppException.notFound("Live ride search request expired or already accepted by another driver.");
         }
 
         User driver = userRepo.findById(driverId)
@@ -221,7 +222,6 @@ public class LiveRideService {
         ride.setStartedAt(LocalDateTime.now());
 
         ride = liveRideRepo.save(ride);
-        cacheService.removeSearchRequest(req.getSearchRequestId());
 
         // Notify Booker
         fcmService.sendToUser(

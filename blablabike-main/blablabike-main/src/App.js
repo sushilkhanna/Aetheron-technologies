@@ -3,6 +3,10 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsConditions from './pages/TermsConditions';
+import RefundPolicy from './pages/RefundPolicy';
+
 // Admin Panel
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -45,6 +49,29 @@ const App = () => {
           <>
             <Navbar />
             <Home />
+            <Footer />
+          </>
+        } />
+
+        {/* Legal Pages */}
+        <Route path="/privacy-policy" element={
+          <>
+            <Navbar />
+            <PrivacyPolicy />
+            <Footer />
+          </>
+        } />
+        <Route path="/terms-and-conditions" element={
+          <>
+            <Navbar />
+            <TermsConditions />
+            <Footer />
+          </>
+        } />
+        <Route path="/refund-policy" element={
+          <>
+            <Navbar />
+            <RefundPolicy />
             <Footer />
           </>
         } />

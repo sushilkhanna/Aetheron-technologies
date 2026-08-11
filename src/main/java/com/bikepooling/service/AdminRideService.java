@@ -3,11 +3,15 @@ package com.bikepooling.service;
 import com.bikepooling.dto.request.AdminRideDTO;
 import com.bikepooling.dto.request.AdminRideLocationDTO;
 import com.bikepooling.dto.request.AdminRideStatsDTO;
+import com.bikepooling.dto.request.SendRideNotificationRequest;
+import com.bikepooling.dto.response.AdminMessageResponse;
 import com.bikepooling.dto.response.PagedResponse;
 import com.bikepooling.entity.LiveRide;
 import com.bikepooling.entity.ScheduledRideInstance;
+import com.bikepooling.entity.User;
 import com.bikepooling.enums.LiveRideState;
 import com.bikepooling.enums.RideState;
+import com.bikepooling.exception.AppException;
 import com.bikepooling.repository.LiveRideRepository;
 import com.bikepooling.repository.ScheduledRideInstanceRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,15 +20,13 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,6 +40,8 @@ public class AdminRideService {
     private final RedisLocationCacheService redisLocationCacheService;
     private final LiveRideCacheService liveRideCacheService;
     private final ScheduledRideLocationCacheService scheduledLocationCacheService;
+    private final FcmService fcmService;
+    private final Msg91SmsClient msg91SmsClient;
 
     public PagedResponse<AdminRideDTO> getRides(
             int page, int size,
@@ -335,6 +339,141 @@ public class AdminRideService {
                 .fromLng(fromLng)
                 .toLat(toLat)
                 .toLng(toLng)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminMessageResponse sendRideNotification(SendRideNotificationRequest request) {
+        if (request.getRideSelections() == null || request.getRideSelections().isEmpty()) {
+            throw AppException.badRequest("At least one ride must be selected");
+        }
+
+        String roleFilter = request.getTargetRole() != null ? request.getTargetRole().trim().toUpperCase() : "BOTH";
+        boolean includeDriver = "DRIVER".equals(roleFilter) || "BOTH".equals(roleFilter);
+        boolean includeBooker = "BOOKER".equals(roleFilter) || "BOTH".equals(roleFilter);
+
+        // Group IDs by ride type to execute bulk batch queries (avoiding N+1 DB calls)
+        List<Long> scheduledIds = request.getRideSelections().stream()
+                .filter(s -> s != null && "SCHEDULED".equalsIgnoreCase(s.getRideType()) && s.getInstanceId() != null)
+                .map(SendRideNotificationRequest.RideSelection::getInstanceId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<Long> liveIds = request.getRideSelections().stream()
+                .filter(s -> s != null && "LIVE".equalsIgnoreCase(s.getRideType()) && s.getInstanceId() != null)
+                .map(SendRideNotificationRequest.RideSelection::getInstanceId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Set<User> targetUsers = new HashSet<>();
+
+        // 1. Bulk fetch scheduled rides
+        if (!scheduledIds.isEmpty()) {
+            List<ScheduledRideInstance> instances = instanceRepo.findAllById(scheduledIds);
+            for (ScheduledRideInstance inst : instances) {
+                if (includeDriver && inst.getTemplate() != null && inst.getTemplate().getPostedBy() != null) {
+                    User driver = inst.getTemplate().getPostedBy();
+                    if (driver.isActive()) {
+                        targetUsers.add(driver);
+                    }
+                }
+                if (includeBooker && inst.getBookedBy() != null) {
+                    User booker = inst.getBookedBy();
+                    if (booker.isActive()) {
+                        targetUsers.add(booker);
+                    }
+                }
+            }
+        }
+
+        // 2. Bulk fetch live rides
+        if (!liveIds.isEmpty()) {
+            List<LiveRide> liveRides = liveRideRepo.findAllById(liveIds);
+            for (LiveRide live : liveRides) {
+                if (includeDriver && live.getDriver() != null) {
+                    User driver = live.getDriver();
+                    if (driver.isActive()) {
+                        targetUsers.add(driver);
+                    }
+                }
+                if (includeBooker && live.getBooker() != null) {
+                    User booker = live.getBooker();
+                    if (booker.isActive()) {
+                        targetUsers.add(booker);
+                    }
+                }
+            }
+        }
+
+        if (targetUsers.isEmpty()) {
+            log.warn("[ADMIN RIDE NOTIFICATION] No active matching users (drivers/bookers) found for selected rides");
+            return AdminMessageResponse.builder()
+                    .totalTargetUsers(0)
+                    .sentPushCount(0)
+                    .sentSmsCount(0)
+                    .failedCount(0)
+                    .statusMessage("No active users found matching the role criteria for selected rides")
+                    .build();
+        }
+
+        int pushCount = 0;
+        int smsCount = 0;
+        int failedCount = 0;
+
+        String title = (request.getTitle() != null && !request.getTitle().isBlank())
+                ? request.getTitle().trim()
+                : "Ride Announcement";
+
+        String message = request.getMessage() != null ? request.getMessage().trim() : "";
+
+        for (User u : targetUsers) {
+            boolean success = false;
+
+            // Push Notification via FCM
+            if (request.isSendPush()) {
+                try {
+                    fcmService.sendToUser(
+                            u.getId(),
+                            title,
+                            message,
+                            Map.of("type", "ADMIN_ANNOUNCEMENT")
+                    );
+                    pushCount++;
+                    success = true;
+                } catch (Exception e) {
+                    log.error("[ADMIN RIDE NOTIFICATION - FCM] Failed to send FCM push to userId={}: {}", u.getId(), e.getMessage());
+                }
+            }
+
+            // SMS via MSG91
+            if (request.isSendSms()) {
+                if (u.getPhone() == null || u.getPhone().isBlank()) {
+                    log.warn("[ADMIN RIDE NOTIFICATION - SMS] Skipped SMS for userId={} — phone number is empty", u.getId());
+                } else {
+                    try {
+                        boolean smsOk = msg91SmsClient.sendSms(u.getPhone(), message, "ADMIN RIDE NOTIFICATION");
+                        if (smsOk) {
+                            smsCount++;
+                            success = true;
+                        }
+                    } catch (Exception e) {
+                        log.error("[ADMIN RIDE NOTIFICATION - SMS] Failed to send MSG91 SMS to userId={}: {}", u.getId(), e.getMessage());
+                    }
+                }
+            }
+
+            if (!success) {
+                failedCount++;
+            }
+        }
+
+        return AdminMessageResponse.builder()
+                .totalTargetUsers(targetUsers.size())
+                .sentPushCount(pushCount)
+                .sentSmsCount(smsCount)
+                .failedCount(failedCount)
+                .statusMessage(String.format("Ride notification processed for %d participants (Push: %d, SMS: %d)",
+                        targetUsers.size(), pushCount, smsCount))
                 .build();
     }
 }

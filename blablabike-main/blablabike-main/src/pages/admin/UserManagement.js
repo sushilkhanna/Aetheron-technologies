@@ -4,7 +4,7 @@ import {
   Users, Search, Filter, Eye, Ban, CheckCircle, XCircle,
   RefreshCw, Shield, AlertCircle, ChevronLeft, ChevronRight,
   ArrowUpDown, ArrowUp, ArrowDown, Loader2, UserCheck, Bike, Mail, Phone,
-  ToggleLeft, ToggleRight, ChevronDown, Check
+  ToggleLeft, ToggleRight, ChevronDown, Check, Send, MessageSquare, CheckSquare, Square, Bell, Smartphone
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import getApiConfig from '../../config/api';
@@ -33,6 +33,18 @@ const UserManagement = () => {
   // ─── Sort state ────────────────────────────────────────
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortDir, setSortDir] = useState('desc');
+
+  // ─── User selection & MSG91/Push messaging state ───────
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [selectAllFiltered, setSelectAllFiltered] = useState(false);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageForm, setMessageForm] = useState({
+    title: 'Update from BikePooling',
+    message: '',
+    sendPush: true,
+    sendSms: true,
+  });
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   // ─── User detail modal ────────────────────────────────
   const [selectedUser, setSelectedUser] = useState(null);
@@ -175,6 +187,89 @@ const UserManagement = () => {
       showToast(msg, 'error');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // ─── Selection Helpers ─────────────────────────────────
+  const isUserSelected = (id) => selectedUserIds.includes(id);
+
+  const toggleSelectUser = (id) => {
+    setSelectAllFiltered(false);
+    setSelectedUserIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllPage = () => {
+    setSelectAllFiltered(false);
+    const currentPageIds = users.map(u => u.id).filter(Boolean);
+    const allPageSelected = currentPageIds.every(id => selectedUserIds.includes(id));
+
+    if (allPageSelected) {
+      setSelectedUserIds(prev => prev.filter(id => !currentPageIds.includes(id)));
+    } else {
+      setSelectedUserIds(prev => Array.from(new Set([...prev, ...currentPageIds])));
+    }
+  };
+
+  const handleSelectAllFiltered = () => {
+    setSelectAllFiltered(true);
+    setSelectedUserIds(users.map(u => u.id));
+  };
+
+  const clearSelection = () => {
+    setSelectedUserIds([]);
+    setSelectAllFiltered(false);
+  };
+
+  const isAllPageSelected = users.length > 0 && users.map(u => u.id).every(id => selectedUserIds.includes(id));
+
+  // ─── Send Notification / SMS (MSG91) Handler ────────────
+  const handleSendAdminMessage = async (e) => {
+    if (e) e.preventDefault();
+    if (!messageForm.message.trim()) {
+      showToast('Please enter message content', 'error');
+      return;
+    }
+    if (!messageForm.sendPush && !messageForm.sendSms) {
+      showToast('Please select at least one delivery channel (Push or SMS)', 'error');
+      return;
+    }
+
+    setSendingMessage(true);
+    try {
+      const { baseURL } = getApiConfig();
+      const payload = {
+        userIds: selectAllFiltered ? null : selectedUserIds,
+        targetAllFiltered: selectAllFiltered,
+        search: searchTerm.trim() || null,
+        active: filterActive !== 'all' ? (filterActive === 'true') : null,
+        role: filterRole !== 'all' ? filterRole : null,
+        sendPush: messageForm.sendPush,
+        sendSms: messageForm.sendSms,
+        title: messageForm.title.trim() || 'Update from BikePooling',
+        message: messageForm.message.trim(),
+      };
+
+      const res = await adminApiFetch(`${baseURL}/admin/users/send-message`, 'POST', payload);
+      const data = res.data;
+      showToast(
+        data?.statusMessage || `Message sent successfully! (Push: ${data?.sentPushCount || 0}, SMS: ${data?.sentSmsCount || 0})`,
+        'success'
+      );
+      setShowMessageModal(false);
+      clearSelection();
+      setMessageForm({
+        title: 'Update from BikePooling',
+        message: '',
+        sendPush: true,
+        sendSms: true,
+      });
+    } catch (err) {
+      console.error('Failed to send admin message:', err);
+      showToast(err.message || 'Failed to send message', 'error');
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -564,6 +659,49 @@ const UserManagement = () => {
           </div>
         )}
 
+        {/* ── Sticky Selection & Action Bar ── */}
+        {(selectedUserIds.length > 0 || selectAllFiltered) && (
+          <div className="sticky top-4 z-30 mb-6 bg-gradient-to-r from-orange-600 to-orange-500 rounded-xl p-4 shadow-xl text-white flex flex-col sm:flex-row items-center justify-between gap-4 border border-orange-400/40">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center font-bold">
+                <CheckSquare size={20} />
+              </div>
+              <div>
+                <p className="font-bold text-sm">
+                  {selectAllFiltered ? `All ${totalElements} filtered users selected` : `${selectedUserIds.length} user(s) selected`}
+                </p>
+                <p className="text-xs text-white/80">
+                  Ready to dispatch FCM Push or MSG91 Text SMS
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setShowMessageModal(true)}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white text-orange-600 rounded-lg font-bold text-sm hover:bg-orange-50 transition-all shadow-md"
+              >
+                <Send size={16} />
+                <span>Send Notification / SMS</span>
+              </button>
+              {!selectAllFiltered && totalElements > selectedUserIds.length && (
+                <button
+                  onClick={handleSelectAllFiltered}
+                  className="px-3 py-2 bg-black/20 hover:bg-black/30 text-white rounded-lg text-xs font-semibold transition-colors"
+                >
+                  Select All {totalElements} Filtered
+                </button>
+              )}
+              <button
+                onClick={clearSelection}
+                className="p-2 hover:bg-black/20 text-white rounded-lg transition-colors"
+                title="Deselect All"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Users Table / Empty / Loading ───────────── */}
         <div className="bg-gray-800 border border-orange-500/20 rounded-xl overflow-hidden">
           {loading ? (
@@ -596,6 +734,15 @@ const UserManagement = () => {
                 <table className="w-full" id="users-table">
                   <thead className="bg-gray-900/80 border-b border-orange-500/20">
                     <tr>
+                      <th className="px-4 py-4 text-center w-12">
+                        <button
+                          onClick={toggleSelectAllPage}
+                          className="text-orange-400 hover:text-orange-300 transition-colors p-1"
+                          title={isAllPageSelected ? "Unselect all on page" : "Select all on page"}
+                        >
+                          {isAllPageSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                        </button>
+                      </th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-orange-400 uppercase tracking-wider">
                         User
                       </th>
@@ -627,11 +774,22 @@ const UserManagement = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-orange-500/10">
-                    {users.map((user, idx) => (
+                    {users.map((user, idx) => {
+                      const selected = isUserSelected(user.id);
+                      return (
                       <tr
                         key={user.id || idx}
-                        className="hover:bg-gray-700/30 transition-colors group"
+                        className={`transition-colors group ${selected ? 'bg-orange-500/10' : 'hover:bg-gray-700/30'}`}
                       >
+                        {/* Checkbox cell */}
+                        <td className="px-4 py-4 text-center">
+                          <button
+                            onClick={() => toggleSelectUser(user.id)}
+                            className="text-orange-400 hover:text-orange-300 transition-colors p-1"
+                          >
+                            {selected ? <CheckSquare size={18} /> : <Square size={18} className="text-gray-500" />}
+                          </button>
+                        </td>
                         {/* User info cell */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -700,7 +858,8 @@ const UserManagement = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>
@@ -782,6 +941,142 @@ const UserManagement = () => {
           )}
         </div>
       </main>
+
+      {/* ── Send Notification & MSG91 SMS Modal ───────────── */}
+      {showMessageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => !sendingMessage && setShowMessageModal(false)} />
+          <div className="relative bg-gray-800 border border-orange-500/30 rounded-2xl max-w-lg w-full p-6 shadow-2xl z-10">
+            <button
+              onClick={() => !sendingMessage && setShowMessageModal(false)}
+              className="absolute top-4 right-4 p-1.5 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
+            >
+              <XCircle size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center">
+                <Send size={22} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Send Notification / SMS</h2>
+                <p className="text-xs text-orange-300/70">
+                  {selectAllFiltered
+                    ? `Targeting ALL ${totalElements} filtered users`
+                    : `Targeting ${selectedUserIds.length} selected user(s)`}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSendAdminMessage} className="space-y-4">
+              {/* Delivery Channels */}
+              <div>
+                <label className="block text-xs font-semibold text-orange-300 uppercase tracking-wider mb-2">Delivery Channels</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${messageForm.sendPush ? 'bg-orange-500/15 border-orange-500/50 text-white' : 'bg-gray-700/50 border-gray-600 text-gray-400'}`}>
+                    <input
+                      type="checkbox"
+                      checked={messageForm.sendPush}
+                      onChange={(e) => setMessageForm({ ...messageForm, sendPush: e.target.checked })}
+                      className="hidden"
+                    />
+                    <Bell size={18} className={messageForm.sendPush ? 'text-orange-400' : 'text-gray-400'} />
+                    <div>
+                      <p className="text-sm font-semibold">In-App Push</p>
+                      <p className="text-[10px] text-gray-400">Via FCM</p>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${messageForm.sendSms ? 'bg-orange-500/15 border-orange-500/50 text-white' : 'bg-gray-700/50 border-gray-600 text-gray-400'}`}>
+                    <input
+                      type="checkbox"
+                      checked={messageForm.sendSms}
+                      onChange={(e) => setMessageForm({ ...messageForm, sendSms: e.target.checked })}
+                      className="hidden"
+                    />
+                    <Smartphone size={18} className={messageForm.sendSms ? 'text-orange-400' : 'text-gray-400'} />
+                    <div>
+                      <p className="text-sm font-semibold">MSG91 SMS</p>
+                      <p className="text-[10px] text-gray-400">Text Message</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Title */}
+              {messageForm.sendPush && (
+                <div>
+                  <label className="block text-xs font-semibold text-orange-300 uppercase tracking-wider mb-1">Notification Title</label>
+                  <input
+                    type="text"
+                    value={messageForm.title}
+                    onChange={(e) => setMessageForm({ ...messageForm, title: e.target.value })}
+                    placeholder="Title for push notification..."
+                    className="w-full px-3 py-2.5 bg-gray-700 border border-orange-500/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required={messageForm.sendPush}
+                  />
+                </div>
+              )}
+
+              {/* Message Body */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-semibold text-orange-300 uppercase tracking-wider">Message Content</label>
+                  <span className="text-[11px] text-gray-400">{messageForm.message.length} chars</span>
+                </div>
+                <textarea
+                  rows={4}
+                  value={messageForm.message}
+                  onChange={(e) => setMessageForm({ ...messageForm, message: e.target.value })}
+                  placeholder="Type your announcement or update message here..."
+                  className="w-full px-3 py-2.5 bg-gray-700 border border-orange-500/30 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+
+              {/* Live Message Preview */}
+              {messageForm.message.trim() && (
+                <div className="p-3 rounded-xl bg-gray-900/80 border border-orange-500/20 text-xs space-y-1">
+                  <p className="text-orange-400 font-semibold flex items-center gap-1.5">
+                    <MessageSquare size={14} /> Message Preview
+                  </p>
+                  {messageForm.sendPush && <p className="text-white font-medium">{messageForm.title}</p>}
+                  <p className="text-gray-300 leading-relaxed">{messageForm.message}</p>
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowMessageModal(false)}
+                  disabled={sendingMessage}
+                  className="flex-1 py-2.5 bg-gray-700 text-gray-300 rounded-lg font-medium hover:bg-gray-600 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingMessage || !messageForm.message.trim()}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-lg font-bold hover:from-orange-500 hover:to-orange-400 transition-all text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                >
+                  {sendingMessage ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={16} />
+                      <span>Dispatch Message</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── User Detail Modal ───────────────────────────── */}
       {selectedUser && <UserDetailModal user={selectedUser} onClose={() => setSelectedUser(null)} />}

@@ -4,7 +4,7 @@ import {
   Bike, Search, Filter, Eye, RefreshCw, ChevronLeft, ChevronRight,
   XCircle, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle,
   MapPin, Navigation, Clock, DollarSign, Users, Activity, Radio,
-  TrendingUp, X, Map as MapIcon, Shield,
+  TrendingUp, X, Map as MapIcon, Shield, Bell, Send, Smartphone, UserCheck, CheckSquare, Square,
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import getApiConfig from '../../config/api';
@@ -452,6 +452,279 @@ const RideDetailModal = ({ ride, onClose, onOpenMap }) => {
   );
 };
 
+// ── Send Notification Modal ──────────────────────────────────────────────────
+
+// Helper to calculate SMS segments (160 chars for single segment, 153 chars per multi-part segment)
+const getSmsSegments = (text) => {
+  if (!text) return { chars: 0, segments: 0 };
+  const len = text.length;
+  if (len === 0) return { chars: 0, segments: 0 };
+  if (len <= 160) return { chars: len, segments: 1 };
+  return { chars: len, segments: Math.ceil(len / 153) };
+};
+
+const SendRideNotificationModal = ({ targetRides, onClose, onSuccess, getToken }) => {
+  const [targetRole, setTargetRole] = useState('BOTH'); // 'DRIVER', 'BOOKER', 'BOTH'
+  const [sendPush, setSendPush]     = useState(true);
+  const [sendSms, setSendSms]       = useState(true);
+  const [title, setTitle]           = useState('Ride Announcement');
+  const [message, setMessage]       = useState('');
+  const [sending, setSending]       = useState(false);
+  const [error, setError]           = useState(null);
+
+  if (!targetRides || targetRides.length === 0) return null;
+
+  const smsStats = getSmsSegments(message);
+
+  const handleSend = async () => {
+    if (!message.trim()) {
+      setError('Please enter notification message content.');
+      return;
+    }
+    if (!sendPush && !sendSms) {
+      setError('Please select at least one delivery channel (FCM Push or SMS).');
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+
+    try {
+      const token = getToken();
+      if (!token) return;
+      const { baseURL } = getApiConfig();
+
+      const rideSelections = targetRides.map(r => ({
+        instanceId: r.instanceId || r.rideId || r.id,
+        rideType: r.rideType || 'SCHEDULED'
+      }));
+
+      const res = await fetch(`${baseURL}/admin/rides/send-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          rideSelections,
+          targetRole,
+          sendPush,
+          sendSms,
+          title: title.trim() || 'Ride Announcement',
+          message: message.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || `Server error: ${res.status}`);
+      }
+
+      const json = await res.json();
+      const respData = json.data || {};
+      onSuccess(respData.statusMessage || 'Notification dispatched successfully!');
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to dispatch notification');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-gray-900 border border-orange-500/30 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl shadow-orange-500/10">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-orange-500/20 bg-gray-900">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <Bell size={20} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-lg">Send Ride Notification</h3>
+              <p className="text-xs text-orange-300/60">
+                Targeting {targetRides.length} selected ride{targetRides.length > 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+            <X size={20} className="text-orange-400" />
+          </button>
+        </div>
+
+        {/* Form Body */}
+        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-red-400 text-sm">
+              <AlertCircle size={16} className="flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Ride Summary Pill */}
+          <div className="p-3 bg-gray-800/80 border border-orange-500/15 rounded-xl flex items-center justify-between text-xs text-orange-200">
+            <span className="flex items-center gap-2">
+              <Bike size={16} className="text-orange-400" />
+              Rides Selected: <strong className="text-white font-mono">{targetRides.length}</strong>
+            </span>
+            <span className="text-orange-400/60 truncate max-w-[200px]">
+              IDs: {targetRides.map(r => `#${r.instanceId || r.rideId || r.id}`).slice(0, 3).join(', ')}
+              {targetRides.length > 3 ? ` +${targetRides.length - 3} more` : ''}
+            </span>
+          </div>
+
+          {/* Target Role Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-orange-300 uppercase tracking-wider mb-2">
+              Recipient Role Filter
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'BOTH',   label: 'Both',   icon: <Users size={14} />,   sub: 'Driver & Booker' },
+                { id: 'DRIVER', label: 'Driver', icon: <UserCheck size={14} />, sub: 'Drivers only' },
+                { id: 'BOOKER', label: 'Booker', icon: <Users size={14} />,   sub: 'Bookers only' },
+              ].map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTargetRole(item.id)}
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                    targetRole === item.id
+                      ? 'border-orange-500 bg-orange-500/15 text-white shadow-md shadow-orange-500/10'
+                      : 'border-orange-500/20 bg-gray-800/50 text-orange-300/70 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-semibold text-xs mb-0.5">
+                    {item.icon} {item.label}
+                  </div>
+                  <div className="text-[10px] opacity-70">{item.sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Delivery Channels */}
+          <div>
+            <label className="block text-xs font-semibold text-orange-300 uppercase tracking-wider mb-2">
+              Delivery Channels
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                sendPush ? 'border-orange-500/40 bg-orange-500/10 text-white' : 'border-orange-500/20 bg-gray-800/50 text-gray-400'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={sendPush}
+                  onChange={e => setSendPush(e.target.checked)}
+                  className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 bg-gray-700 border-gray-600 cursor-pointer"
+                />
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Bell size={14} className="text-orange-400" /> Push Notification
+                  </div>
+                  <div className="text-[10px] text-orange-300/50">FCM Mobile Alert</div>
+                </div>
+              </label>
+
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                sendSms ? 'border-orange-500/40 bg-orange-500/10 text-white' : 'border-orange-500/20 bg-gray-800/50 text-gray-400'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={sendSms}
+                  onChange={e => setSendSms(e.target.checked)}
+                  className="w-4 h-4 rounded text-orange-500 focus:ring-orange-500 bg-gray-700 border-gray-600 cursor-pointer"
+                />
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Smartphone size={14} className="text-orange-400" /> SMS Message
+                  </div>
+                  <div className="text-[10px] text-orange-300/50">MSG91 Transactional</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Title Input */}
+          <div>
+            <label className="block text-xs font-semibold text-orange-300 uppercase tracking-wider mb-1.5">
+              Notification Title
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. Important Ride Update"
+              className="w-full px-3.5 py-2.5 bg-gray-800 border border-orange-500/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-white text-sm placeholder-gray-500"
+            />
+          </div>
+
+          {/* Message Textarea */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-orange-300 uppercase tracking-wider">
+                Message Content <span className="text-red-400">*</span>
+              </label>
+              <span className={`text-[11px] ${message.length > 900 ? 'text-red-400 font-semibold' : 'text-orange-300/50'}`}>
+                {message.length}/1000
+              </span>
+            </div>
+            <textarea
+              rows={4}
+              maxLength={1000}
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="Type your message to drivers/bookers for the selected ride(s)..."
+              className="w-full px-3.5 py-2.5 bg-gray-800 border border-orange-500/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-white text-sm placeholder-gray-500 resize-none"
+            />
+            {sendSms && message.length > 0 && (
+              <div className="mt-1.5 flex items-center justify-between text-[11px] text-orange-300/70 bg-orange-500/10 px-3 py-1.5 rounded-lg border border-orange-500/20">
+                <span className="flex items-center gap-1">
+                  <Smartphone size={12} className="text-orange-400" /> Estimated SMS Payload:
+                </span>
+                <span className="font-mono font-medium text-orange-200">
+                  {smsStats.chars} chars · {smsStats.segments} SMS segment{smsStats.segments > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-orange-500/20 bg-gray-900">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={sending}
+            className="px-4 py-2 text-sm font-medium text-orange-300 hover:bg-gray-800 rounded-xl border border-orange-500/20 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={sending || !message.trim()}
+            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-xl shadow-lg shadow-orange-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {sending ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" /> Sending...
+              </>
+            ) : (
+              <>
+                <Send size={16} /> Send Notification
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -480,6 +753,11 @@ const RideManagement = () => {
 
   const [selectedRide, setSelectedRide] = useState(null);
   const [mapRide, setMapRide]           = useState(null);
+
+  // Selection & Notification State (Map of rideKey -> ride object for persistent multi-page selection)
+  const [selectedRidesMap, setSelectedRidesMap]   = useState({});
+  const [showNotifyModal, setShowNotifyModal]     = useState(false);
+  const [notifyTargetRides, setNotifyTargetRides] = useState([]);
 
   // Location stored in a ref → changing it does NOT remount MapContainer
   const locationRef    = useRef(null);
@@ -637,7 +915,38 @@ const RideManagement = () => {
     setSearchInput(''); setSearchTerm('');
     setFilterState('all'); setDateFrom(''); setDateTo('');
     setSortBy('departAt'); setSortDir('desc'); setPage(0);
+    setSelectedRidesMap({});
   };
+
+  const getRideKey = (ride) => `${ride.rideType || 'SCHEDULED'}_${ride.instanceId || ride.rideId || ride.id}`;
+
+  const toggleSelectRide = (ride) => {
+    const key = getRideKey(ride);
+    setSelectedRidesMap(prev => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      else next[key] = ride;
+      return next;
+    });
+  };
+
+  const toggleSelectAllPage = () => {
+    const pageKeys = rides.map(r => getRideKey(r));
+    const allSelected = pageKeys.every(k => Boolean(selectedRidesMap[k]));
+
+    setSelectedRidesMap(prev => {
+      const next = { ...prev };
+      if (allSelected) {
+        pageKeys.forEach(k => delete next[k]);
+      } else {
+        rides.forEach(r => { next[getRideKey(r)] = r; });
+      }
+      return next;
+    });
+  };
+
+  const getSelectedRidesList = () => Object.values(selectedRidesMap);
+  const selectedCount = Object.keys(selectedRidesMap).length;
 
   const hasActiveFilters = searchTerm || filterState !== 'all' || dateFrom || dateTo;
 
@@ -852,7 +1161,7 @@ const RideManagement = () => {
 
         {/* Table */}
         <div className="bg-gray-800 border border-orange-500/20 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-orange-500/20 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-orange-500/20 flex flex-wrap items-center justify-between gap-4">
             <h3 className="text-white font-semibold flex items-center gap-2">
               <Bike size={18} className="text-orange-400" />
               All Rides
@@ -860,6 +1169,28 @@ const RideManagement = () => {
                 {totalElements > 0 ? `(${totalElements.toLocaleString()} total)` : ''}
               </span>
             </h3>
+
+            {selectedCount > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setNotifyTargetRides(getSelectedRidesList());
+                    setShowNotifyModal(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold text-xs shadow-lg shadow-orange-500/20 transition-all transform active:scale-95"
+                >
+                  <Bell size={16} />
+                  Send Notification ({selectedCount})
+                </button>
+                <button
+                  onClick={() => setSelectedRidesMap({})}
+                  className="px-2.5 py-2 text-xs text-orange-400/70 hover:text-orange-400 hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Clear Selections"
+                >
+                  Deselect All
+                </button>
+              </div>
+            )}
           </div>
 
           {loading ? <TableSkeleton /> : rides.length === 0 ? (
@@ -883,6 +1214,15 @@ const RideManagement = () => {
                 <table className="w-full">
                   <thead className="bg-gray-900/80 border-b border-orange-500/20">
                     <tr>
+                      <th className="px-4 py-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={rides.length > 0 && rides.every(r => Boolean(selectedRidesMap[getRideKey(r)]))}
+                          onChange={toggleSelectAllPage}
+                          className="w-4 h-4 rounded text-orange-500 bg-gray-700 border-orange-500/30 focus:ring-orange-500 cursor-pointer"
+                          title="Select all on this page"
+                        />
+                      </th>
                       {['ID','Driver','Booker','Status','Route','Departure','Dist','Actions'].map(h => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-orange-400 uppercase tracking-wider"
                           onClick={h === 'Departure' ? () => handleSort('departAt') : undefined}
@@ -897,8 +1237,17 @@ const RideManagement = () => {
                   <tbody className="divide-y divide-orange-500/10">
                     {rides.map((ride, idx) => {
                       const canTrack = ['LIVE','STARTED','VERIFIED'].includes(ride.state);
+                      const isSelected = Boolean(selectedRidesMap[getRideKey(ride)]);
                       return (
-                        <tr key={ride.instanceId || ride.rideId || idx} className="hover:bg-gray-700/30 transition-colors">
+                        <tr key={ride.instanceId || ride.rideId || idx} className={`transition-colors ${isSelected ? 'bg-orange-500/10' : 'hover:bg-gray-700/30'}`}>
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectRide(ride)}
+                              className="w-4 h-4 rounded text-orange-500 bg-gray-700 border-orange-500/30 focus:ring-orange-500 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-4 py-3">
                             <span className="text-sm font-mono text-white/80">#{ride.instanceId || ride.rideId || ride.id}</span>
                           </td>
@@ -942,6 +1291,13 @@ const RideManagement = () => {
                               <button onClick={() => setSelectedRide(ride)}
                                 className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors" title="View Details">
                                 <Eye size={16} className="text-orange-400" />
+                              </button>
+                              <button onClick={() => {
+                                setNotifyTargetRides([ride]);
+                                setShowNotifyModal(true);
+                              }}
+                                className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors" title="Send Notification & SMS">
+                                <Bell size={16} className="text-orange-400" />
                               </button>
                               {canTrack && (
                                 <button onClick={() => setMapRide(ride)}
@@ -1017,6 +1373,22 @@ const RideManagement = () => {
           locationRef={locationRef}
           locationVersion={locationVersion}
           onClose={() => { setMapRide(null); locationRef.current = null; setLocationVersion(0); }}
+        />
+      )}
+
+      {/* Send Ride Notification Modal */}
+      {showNotifyModal && (
+        <SendRideNotificationModal
+          targetRides={notifyTargetRides}
+          onClose={() => {
+            setShowNotifyModal(false);
+            setNotifyTargetRides([]);
+          }}
+          onSuccess={(msg) => {
+            showToast(msg, 'success');
+            setSelectedRidesMap({});
+          }}
+          getToken={getToken}
         />
       )}
 

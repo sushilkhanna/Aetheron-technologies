@@ -1,7 +1,9 @@
 package com.bikepooling.controller;
 
+import com.bikepooling.dto.request.SendAdminMessageRequest;
 import com.bikepooling.dto.request.UpdateUserRoleRequest;
 import com.bikepooling.dto.request.UpdateUserStatusRequest;
+import com.bikepooling.dto.response.AdminMessageResponse;
 import com.bikepooling.dto.response.ApiResponse;
 import com.bikepooling.dto.response.PagedResponse;
 import com.bikepooling.dto.response.UserDTO;
@@ -51,5 +53,13 @@ public class AdminUserController {
             @RequestBody @Valid UpdateUserRoleRequest request) {
 
         return ResponseEntity.ok(adminUserService.updateUserRole(userId, request.getRole()));
+    }
+
+    @PostMapping("/send-message")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AdminMessageResponse>> sendMessage(
+            @RequestBody @Valid SendAdminMessageRequest request) {
+
+        return ResponseEntity.ok(adminUserService.sendAdminMessage(request));
     }
 }

@@ -66,9 +66,9 @@ const HeroSection = ({ bgIndex, setBgIndex }) => (
 
           <div className="grid grid-cols-3 gap-3 mb-8 fade-up-3">
             {[
-              { value: '6.2K+', label: 'Total Users' },
-              { value: '2.1K+', label: 'Verified Users' },
-              { value: '1.8K+', label: 'Active Users' },
+              { value: '5.4K+', label: 'Active Commuters' },
+              { value: '1.8K+', label: 'Verified Riders' },
+              { value: '98.6%', label: 'Safety Score' },
             ].map((s, i) => (
               <div key={i} className="rounded-xl p-3 text-center"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -98,15 +98,15 @@ const HeroSection = ({ bgIndex, setBgIndex }) => (
               style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-white text-sm font-medium">Active Users</span>
+                <span className="text-white text-sm font-medium">Live Commute Routes</span>
               </div>
-              <span className="text-green-400 text-sm font-bold">1.8K+</span>
+              <span className="text-green-400 text-xs font-semibold px-2 py-0.5 rounded bg-green-500/10 border border-green-500/20">Active Now</span>
             </div>
             <div className="p-4 space-y-3">
               {[
-                { from: 'Delhi', to: 'Gurgaon', time: '8:30 AM', seats: 2, rating: 4.8, price: '₹120' },
-                { from: 'Mumbai', to: 'Andheri', time: '9:15 AM', seats: 1, rating: 4.9, price: '₹80' },
-                { from: 'Bengaluru', to: 'Whitefield', time: '7:45 AM', seats: 1, rating: 4.7, price: '₹95' },
+                { from: 'Delhi CP', to: 'Gurgaon Cyber City', time: '8:30 AM', seats: 1, rating: 4.9, price: '₹45' },
+                { from: 'Mumbai BKC', to: 'Andheri West', time: '9:15 AM', seats: 1, rating: 4.8, price: '₹35' },
+                { from: 'Bengaluru Indiranagar', to: 'Whitefield Tech Park', time: '8:00 AM', seats: 1, rating: 4.9, price: '₹50' },
               ].map((r, i) => (
                 <div key={i} className="flex items-center justify-between p-3 rounded-lg"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -120,7 +120,7 @@ const HeroSection = ({ bgIndex, setBgIndex }) => (
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-gray-500">{r.time}</span>
                         <span className="text-xs text-gray-600">·</span>
-                        <span className="text-xs text-gray-500">{r.seats} seat{r.seats > 1 ? 's' : ''}</span>
+                        <span className="text-xs text-gray-500">{r.seats} seat available</span>
                         <span className="text-xs text-gray-600">·</span>
                         <Star size={9} className="text-yellow-400 fill-yellow-400" />
                         <span className="text-xs text-gray-500">{r.rating}</span>

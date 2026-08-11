@@ -23,10 +23,11 @@ public class FcmService {
 
     @Async
     public void sendToUser(Long userId, String title, String body, Map<String, String> data) {
+        String logPrefix = getLogPrefix(data);
         List<FcmToken> tokens = fcmTokenRepo.findByUserId(userId);
 
         if (tokens.isEmpty()) {
-            log.debug("No FCM tokens for userId={}", userId);
+            log.warn("{} Push notification failed — No FCM token found for userId={}", logPrefix, userId);
             return;
         }
 
@@ -45,20 +46,49 @@ public class FcmService {
                         .build();
 
                 String response = FirebaseMessaging.getInstance().send(message);
-                log.debug("FCM sent to userId={} token={} response={}", userId,
-                        fcmToken.getToken().substring(0, 10) + "...", response);
+                log.info("{} Push notification sent successfully to userId={} (Token: {}) response={}",
+                        logPrefix, userId, maskToken(fcmToken.getToken()), response);
 
             } catch (FirebaseMessagingException e) {
-                // token is invalid or unregistered — remove it
                 if (e.getMessagingErrorCode() == MessagingErrorCode.INVALID_ARGUMENT
                         || e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
-                    log.warn("Stale FCM token removed for userId={}", userId);
+                    log.warn("{} Stale/Invalid FCM token removed for userId={}", logPrefix, userId);
                     fcmTokenRepo.deleteByToken(fcmToken.getToken());
                 } else {
-                    log.error("FCM error for userId={}: {}", userId, e.getMessage());
+                    log.error("{} FCM error for userId={}: {}", logPrefix, userId, e.getMessage());
                 }
+            } catch (Exception e) {
+                log.error("{} Failed to send FCM push notification for userId={}: {}", logPrefix, userId, e.getMessage());
             }
         }
+    }
+
+    private String getLogPrefix(Map<String, String> data) {
+        if (data == null || !data.containsKey("type")) {
+            return "[FCM]";
+        }
+        String type = data.get("type");
+        if (type.startsWith("SOS_")) {
+            return "[SOS EMERGENCY - FCM]";
+        }
+        if (type.startsWith("ADMIN_")) {
+            return "[ADMIN PANEL - FCM]";
+        }
+        if (type.startsWith("SCHEDULED_")) {
+            return "[SCHEDULED RIDE - FCM]";
+        }
+        if (type.startsWith("LIVE_RIDE_")) {
+            return "[LIVE RIDE - FCM]";
+        }
+        if (type.startsWith("CHAT_")) {
+            return "[CHAT - FCM]";
+        }
+        return "[FCM - " + type + "]";
+    }
+
+    private String maskToken(String token) {
+        if (token == null || token.length() <= 10) return "****";
+        return token.substring(0, 10) + "...";
     }
 
     // ── Scheduled Ride Notification Helpers ───────────────────────────

@@ -39,7 +39,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/api/auth/verify-registration-otp", 10,
             "/api/auth/login/send-otp",           5,
             "/api/auth/login/verify-otp",         10,
-            "/api/auth/login/password",           10
+            "/api/auth/login/password",           10,
+            "/api/auth/admin/login/send-otp",     5,
+            "/api/auth/admin/login/verify-otp",   10
     );
 
     private static final Map<String, Integer> USER_LIMITS = Map.of(

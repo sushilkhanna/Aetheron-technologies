@@ -45,7 +45,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = header.substring(7);
 
         if (!jwtUtil.isTokenValid(token)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            sendUnauthorizedResponse(response, "Invalid or expired authentication token.");
             return;
         }
 
@@ -54,7 +54,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String blacklistKey = "blacklist:user:" + userId;
         if (Boolean.TRUE.equals(redisTemplate.hasKey(blacklistKey))) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            sendUnauthorizedResponse(response, "Session invalidated. Please log in again.");
             return;
         }
 
@@ -68,5 +68,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         SecurityContextHolder.getContext().setAuthentication(auth);
         chain.doFilter(request, response);
+    }
+
+    private void sendUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(String.format(
+                "{\"success\":false,\"data\":null,\"message\":\"%s\"}", message));
     }
 }

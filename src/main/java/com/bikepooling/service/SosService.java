@@ -313,13 +313,13 @@ public class SosService {
 
     private boolean notifyAdminsSms(List<User> admins, String message) {
         if (admins.isEmpty()) {
-            log.warn("No active ADMIN users found — admin SMS not sent");
+            log.warn("[SOS EMERGENCY - SMS] No active ADMIN users found — admin SMS not sent");
             return false;
         }
         boolean anySent = false;
         for (User admin : admins) {
             if (admin.getPhone() != null && !admin.getPhone().isBlank()) {
-                anySent = smsClient.sendSms(admin.getPhone(), message) || anySent;
+                anySent = smsClient.sendSms(admin.getPhone(), message, "SOS EMERGENCY - ADMIN") || anySent;
             }
         }
         return anySent;
@@ -332,13 +332,13 @@ public class SosService {
         if (user.getEmergencyContact3Phone() != null) phones.add(user.getEmergencyContact3Phone());
 
         if (phones.isEmpty()) {
-            log.warn("User {} has no emergency contacts configured — SOS SMS not sent", user.getId());
+            log.warn("[SOS EMERGENCY - SMS] User {} has no emergency contacts configured — SOS SMS not sent", user.getId());
             return false;
         }
 
         boolean anySent = false;
         for (String phone : phones) {
-            anySent = smsClient.sendSms(phone, message) || anySent;
+            anySent = smsClient.sendSms(phone, message, "SOS EMERGENCY - CONTACT") || anySent;
         }
         return anySent;
     }

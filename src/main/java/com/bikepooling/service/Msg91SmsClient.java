@@ -28,20 +28,33 @@ public class Msg91SmsClient {
     private final Msg91Properties msg91Properties;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public boolean sendSms(String phone, String message) {
+    public boolean sendSms(String phone, String message, String context) {
+        String logPrefix = (context != null && !context.isBlank()) ? "[" + context + " - SMS]" : "[SMS]";
+
         if (phone == null || phone.isBlank()) {
-            log.warn("Skipped SOS SMS — empty phone number");
+            log.warn("{} Skipped SMS dispatch — Phone number is empty", logPrefix);
             return false;
         }
+
+        String authKey = (msg91Properties != null && msg91Properties.getAuth() != null) ? msg91Properties.getAuth().getKey() : null;
+        if (authKey == null || authKey.isBlank() || "YOUR_MSG91_AUTH_KEY".equalsIgnoreCase(authKey)) {
+            log.error("{} SMS DISPATCH FAILED — MSG91 Auth Key is missing or unconfigured! Cannot send SMS to {}",
+                    logPrefix, mask(phone));
+            return false;
+        }
+
         try {
             String normalizedPhone = normalize(phone);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("authkey", msg91Properties.getAuth().getKey());
+            headers.set("authkey", authKey);
+
+            String senderId = (msg91Properties.getSender() != null && msg91Properties.getSender().getId() != null)
+                    ? msg91Properties.getSender().getId() : "";
 
             Map<String, Object> body = new HashMap<>();
-            body.put("sender", msg91Properties.getSender().getId());
+            body.put("sender", senderId);
             body.put("route", "4");
             body.put("country", "91");
             body.put("sms", List.of(Map.of(
@@ -52,12 +65,16 @@ public class Msg91SmsClient {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
             restTemplate.postForEntity(MSG91_SEND_URL, request, String.class);
 
-            log.info("SOS SMS sent to {}", mask(normalizedPhone));
+            log.info("{} SMS sent successfully to {}", logPrefix, mask(normalizedPhone));
             return true;
         } catch (Exception e) {
-            log.error("Failed to send SOS SMS to {}: {}", mask(phone), e.getMessage());
+            log.error("{} SMS DISPATCH FAILED for recipient {}: {}", logPrefix, mask(phone), e.getMessage());
             return false;
         }
+    }
+
+    public boolean sendSms(String phone, String message) {
+        return sendSms(phone, message, "GENERAL");
     }
 
     private String normalize(String phone) {

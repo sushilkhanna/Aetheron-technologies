@@ -41,14 +41,11 @@ const Footer = () => (
           </div>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Cities</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Legal & Policy</p>
           <div className="space-y-2.5">
-            {['Delhi', 'Mumbai', 'Bengaluru'].map(c => (
-              <p key={c} className="text-gray-400 text-sm flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                {c}
-              </p>
-            ))}
+            <Link to="/privacy-policy" className="block text-gray-400 hover:text-white text-sm transition-colors">Privacy Policy</Link>
+            <Link to="/terms-and-conditions" className="block text-gray-400 hover:text-white text-sm transition-colors">Terms & Conditions</Link>
+            <Link to="/refund-policy" className="block text-gray-400 hover:text-white text-sm transition-colors">Refund Policy</Link>
           </div>
         </div>
       </div>

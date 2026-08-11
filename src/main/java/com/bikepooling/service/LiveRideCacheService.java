@@ -126,6 +126,10 @@ public class LiveRideCacheService {
         return searchRequests.get(requestId);
     }
 
+    public ActiveSearchRequest claimSearchRequest(Long requestId) {
+        return searchRequests.remove(requestId);
+    }
+
     public void removeSearchRequest(Long requestId) {
         searchRequests.remove(requestId);
     }
