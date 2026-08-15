@@ -120,7 +120,8 @@ public class UserProfileService {
 
     private boolean isProfileComplete(User user) {
         return user.getAddress() != null
-                && user.getRole() != Role.USER;
+                && user.getRole() != null
+                && user.getRole() != Role.GUEST;
     }
 
     private ProfileResponse toProfileResponse(User user) {

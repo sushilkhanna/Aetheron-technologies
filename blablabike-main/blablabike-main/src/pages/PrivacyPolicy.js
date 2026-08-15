@@ -130,7 +130,7 @@ const PrivacyPolicy = () => {
             </p>
             <div className="p-4 rounded-xl" style={{ background: 'rgba(255,112,0,0.08)', border: '1px solid rgba(255,112,0,0.2)' }}>
               <p className="text-sm font-bold text-white">Grievance Redressal Cell - BikePooling</p>
-              <p className="text-xs text-gray-300 mt-1">Email: <a href="mailto:grievance@bikepooling.in" className="text-orange-400 underline">grievance@bikepooling.in</a></p>
+              <p className="text-xs text-gray-300 mt-1">Email: <a href="https://mail.google.com/mail/?view=cm&to=officialbikepooling.in@gmail.com" target="_blank" rel="noopener noreferrer" className="text-orange-400 underline">officialbikepooling.in@gmail.com</a></p>
               <p className="text-xs text-gray-300">Support Hours: Monday to Saturday, 9:00 AM – 6:00 PM IST</p>
             </div>
           </div>

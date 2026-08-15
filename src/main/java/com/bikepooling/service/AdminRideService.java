@@ -192,13 +192,12 @@ public class AdminRideService {
         long totalLive = liveRideRepo.count();
         long totalScheduled = instanceRepo.count();
 
-        long activeLive = liveRideRepo.findAll().stream()
-                .filter(r -> r.getState() == LiveRideState.LIVE || r.getState() == LiveRideState.CONFIRMED || r.getState() == LiveRideState.VERIFIED)
-                .count();
+        // Use COUNT queries instead of loading all records into memory
+        long activeLive = liveRideRepo.countByStateIn(
+                List.of(LiveRideState.LIVE, LiveRideState.CONFIRMED, LiveRideState.VERIFIED));
 
-        long activeScheduled = instanceRepo.findAll().stream()
-                .filter(i -> i.getState() == RideState.OPEN || i.getState() == RideState.BOOKED || i.getState() == RideState.STARTED || i.getState() == RideState.VERIFIED)
-                .count();
+        long activeScheduled = instanceRepo.countByStateIn(
+                List.of(RideState.OPEN, RideState.BOOKED, RideState.STARTED, RideState.VERIFIED));
 
         return AdminRideStatsDTO.builder()
                 .totalToday((int) (totalLive + totalScheduled))
@@ -260,22 +259,17 @@ public class AdminRideService {
     public List<AdminRideLocationDTO> getAllActiveLocations() {
         List<AdminRideLocationDTO> activeLocs = new ArrayList<>();
 
-        // Add active live rides
-        List<LiveRide> liveList = liveRideRepo.findAll();
+        // Use pre-filtered queries instead of findAll() + Java filtering
+        List<LiveRide> liveList = liveRideRepo.findAllActiveLiveRides();
         for (LiveRide live : liveList) {
-            if (live.getState() == LiveRideState.LIVE || live.getState() == LiveRideState.CONFIRMED || live.getState() == LiveRideState.VERIFIED) {
-                AdminRideLocationDTO loc = getRideLocation(live.getId());
-                if (loc != null) activeLocs.add(loc);
-            }
+            AdminRideLocationDTO loc = getRideLocation(live.getId());
+            if (loc != null) activeLocs.add(loc);
         }
 
-        // Add active scheduled ride instances
-        List<ScheduledRideInstance> scheduledList = instanceRepo.findAll();
+        List<ScheduledRideInstance> scheduledList = instanceRepo.findAllActiveInstances();
         for (ScheduledRideInstance inst : scheduledList) {
-            if (inst.getState() == RideState.STARTED || inst.getState() == RideState.VERIFIED || inst.getState() == RideState.BOOKED) {
-                AdminRideLocationDTO loc = getRideLocation(inst.getId());
-                if (loc != null) activeLocs.add(loc);
-            }
+            AdminRideLocationDTO loc = getRideLocation(inst.getId());
+            if (loc != null) activeLocs.add(loc);
         }
 
         return activeLocs;

@@ -207,12 +207,17 @@ const AdminLogin = () => {
               <form onSubmit={handleVerifyOtp} className="space-y-6">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wide">Phone Number</label>
-                  <input
-                    value={form.phone}
-                    disabled
-                    className="w-full px-4 py-3 rounded-xl text-gray-300 cursor-not-allowed"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                  />
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3.5 flex items-center gap-1.5 text-gray-400 text-sm font-bold select-none border-r border-gray-700/60 pr-3 z-10">
+                      <span className="text-base">🇮🇳</span>
+                      <span>+91</span>
+                    </div>
+                    <input
+                      value={form.phone}
+                      disabled
+                      className="w-full py-3.5 pl-24 pr-4 rounded-xl bg-gray-800/40 border border-gray-700/60 text-gray-300 font-medium cursor-not-allowed text-sm"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -257,9 +262,10 @@ const AdminLogin = () => {
               <form onSubmit={(e) => { e.preventDefault(); handleSendOtp(); }} className="space-y-6">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wide">Phone Number</label>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Phone size={18} />
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3.5 flex items-center gap-1.5 text-gray-300 text-sm font-bold select-none border-r border-gray-700 pr-3 z-10">
+                      <span className="text-base">🇮🇳</span>
+                      <span>+91</span>
                     </div>
                     <input
                       type="tel"
@@ -268,7 +274,7 @@ const AdminLogin = () => {
                       onChange={handleChange}
                       placeholder="Enter 10-digit phone number"
                       maxLength={10}
-                      className="input-dark w-full pl-12 pr-4 py-3.5 rounded-xl text-sm"
+                      className="w-full py-3.5 pl-24 pr-4 rounded-xl bg-gray-800/80 border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm font-medium transition-all"
                       required
                     />
                   </div>

@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 /**
  * Admin-controlled platform configuration.
  * Single row — always fetch by id = 1.
- * Admin can update these via a future /api/admin/config endpoint.
  */
 @Entity
 @Table(name = "app_config")
@@ -26,7 +25,6 @@ public class AppConfig {
 
     /**
      * Fare charged per kilometre (e.g. 3.00 = ₹3/km).
-     * Used in RideService to calculate ride fare = distanceKm × farePerKm.
      */
     @Column(name = "fare_per_km", nullable = false, precision = 6, scale = 2)
     private BigDecimal farePerKm;
@@ -39,17 +37,32 @@ public class AppConfig {
 
     /**
      * Maximum radius in metres for source/destination matching.
-     * Default 500m. Admin can tighten or loosen this.
      */
     @Column(name = "match_radius_metres", nullable = false)
     private Integer matchRadiusMetres;
 
     /**
      * Time window in minutes for departure time matching (± this value).
-     * Default 30 mins.
      */
     @Column(name = "match_time_window_minutes", nullable = false)
     private Integer matchTimeWindowMinutes;
+
+    // Launch Management Configs
+    @Builder.Default
+    @Column(name = "launch_mode", nullable = false, length = 30)
+    private String launchMode = "COMING_SOON"; // COMING_SOON vs LIVE_LAUNCHED
+
+    @Column(name = "launch_target_date_time")
+    private LocalDateTime launchTargetDateTime;
+
+    @Column(name = "android_app_url", length = 500)
+    private String androidAppUrl;
+
+    @Column(name = "ios_app_url", length = 500)
+    private String iosAppUrl;
+
+    @Column(name = "launch_message", length = 500)
+    private String launchMessage;
 
     @UpdateTimestamp
     @Column(name = "updated_at")

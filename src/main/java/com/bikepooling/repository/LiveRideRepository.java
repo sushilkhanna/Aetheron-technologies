@@ -49,4 +49,7 @@ public interface LiveRideRepository extends JpaRepository<LiveRide, Long> {
         WHERE r.state IN (com.bikepooling.enums.LiveRideState.LIVE, com.bikepooling.enums.LiveRideState.CONFIRMED, com.bikepooling.enums.LiveRideState.VERIFIED)
         """)
     List<LiveRide> findAllActiveLiveRides();
+
+    @Query("SELECT COUNT(r) FROM LiveRide r WHERE r.state IN :states")
+    long countByStateIn(@Param("states") List<LiveRideState> states);
 }

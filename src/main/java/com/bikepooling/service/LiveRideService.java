@@ -101,6 +101,9 @@ public class LiveRideService {
             r.setState(LiveRideState.CANCELLED);
             r.setCancelledAt(LocalDateTime.now());
             liveRideRepo.save(r);
+            // Clean up location caches to prevent stale data
+            redisLocationCacheService.removeLiveRideLocation(r.getId());
+            locationCacheService.removeLocation(r.getId());
         }
         cacheService.removeLiveDriver(driverId);
         log.info("Driver id={} stopped LIVE mode.", driverId);
@@ -223,11 +226,11 @@ public class LiveRideService {
 
         ride = liveRideRepo.save(ride);
 
-        // Notify Booker
+        // Notify Booker — OTP only in data payload, NOT in notification body (prevents lock-screen leakage)
         fcmService.sendToUser(
                 booker.getId(),
                 "Ride Confirmed!",
-                driver.getFullName() + " accepted your ride request. OTP: " + otp,
+                driver.getFullName() + " accepted your ride request. Check the app for your OTP.",
                 Map.of(
                         "type", "LIVE_RIDE_CONFIRMED",
                         "liveRideId", String.valueOf(ride.getId()),
@@ -237,8 +240,8 @@ public class LiveRideService {
                 )
         );
 
-        log.info("Live ride accepted: liveRideId={} driverId={} bookerId={} otp={}",
-                ride.getId(), driverId, booker.getId(), otp);
+        log.info("Live ride accepted: liveRideId={} driverId={} bookerId={}",
+                ride.getId(), driverId, booker.getId());
 
         return LiveRideResponse.from(ride);
     }
@@ -284,11 +287,19 @@ public class LiveRideService {
             throw AppException.forbidden("Only the driver can complete the ride.");
         }
 
+        // State validation: ride must be in VERIFIED or CONFIRMED state to complete
+        if (ride.getState() != LiveRideState.VERIFIED && ride.getState() != LiveRideState.CONFIRMED) {
+            throw AppException.conflict(
+                    "Cannot complete ride in state " + ride.getState() + ". Ride must be VERIFIED or CONFIRMED.");
+        }
+
         ride.setState(LiveRideState.COMPLETED);
         ride.setCompletedAt(LocalDateTime.now());
         ride = liveRideRepo.save(ride);
 
+        // Clean up all caches
         locationCacheService.removeLocation(liveRideId);
+        redisLocationCacheService.removeLiveRideLocation(liveRideId);
         cacheService.removeLiveDriver(driverId);
 
         String driverName = ride.getDriver().getFullName();

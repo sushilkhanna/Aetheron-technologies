@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  BarChart3, Users, UserCheck, Bike, Activity, LogOut, Menu, X, AlertTriangle
+  BarChart3, Users, UserCheck, Bike, Activity, LogOut, Menu, X, AlertTriangle, Smartphone
 } from 'lucide-react';
 
 const AdminLayout = ({ children }) => {
@@ -31,11 +31,12 @@ const AdminLayout = ({ children }) => {
   };
 
   const menuItems = [
-    { icon: BarChart3,    label: 'Dashboard',       path: '/admin/dashboard' },
-    { icon: Users,        label: 'User Management', path: '/admin/users' },
-    { icon: UserCheck,    label: 'Driver KYC',      path: '/admin/driver-kyc' },
-    { icon: Bike,         label: 'Ride Management', path: '/admin/rides' },
-    { icon: AlertTriangle,label: 'SOS Monitoring',  path: '/admin/sos' },
+    { icon: BarChart3,    label: 'Dashboard',           path: '/admin/dashboard' },
+    { icon: Users,        label: 'User Management',     path: '/admin/users' },
+    { icon: Smartphone,   label: 'Coming Soon Users',   path: '/admin/coming-soon-users' },
+    { icon: UserCheck,    label: 'Driver KYC',          path: '/admin/driver-kyc' },
+    { icon: Bike,         label: 'Ride Management',     path: '/admin/rides' },
+    { icon: AlertTriangle,label: 'SOS Monitoring',      path: '/admin/sos' },
   ];
 
   const isActive = (path) => location.pathname === path;

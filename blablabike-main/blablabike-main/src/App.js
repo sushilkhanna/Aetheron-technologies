@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
+import About from './pages/About';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
 import RefundPolicy from './pages/RefundPolicy';
@@ -11,6 +12,7 @@ import RefundPolicy from './pages/RefundPolicy';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
+import ComingSoonSubscribers from './pages/admin/ComingSoonSubscribers';
 import DriverKYC from './pages/admin/DriverKYC';
 import RideManagement from './pages/admin/RideManagement';
 import SosManagement from './pages/admin/SosManagement';
@@ -53,6 +55,15 @@ const App = () => {
           </>
         } />
 
+        {/* About Page */}
+        <Route path="/about" element={
+          <>
+            <Navbar />
+            <About />
+            <Footer />
+          </>
+        } />
+
         {/* Legal Pages */}
         <Route path="/privacy-policy" element={
           <>
@@ -82,6 +93,7 @@ const App = () => {
         {/* Admin Panel Routes - No Navbar or Footer */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<UserManagement />} />
+        <Route path="/admin/coming-soon-users" element={<ComingSoonSubscribers />} />
         <Route path="/admin/driver-kyc" element={<DriverKYC />} />
         <Route path="/admin/rides" element={<RideManagement />} />
         <Route path="/admin/sos" element={<SosManagement />} />

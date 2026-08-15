@@ -1,5 +1,6 @@
 package com.bikepooling.service;
 
+import com.bikepooling.exception.AppException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -93,7 +94,7 @@ public class OtpService {
             log.info("MSG91 response: {}", response);
         } catch (Exception e) {
             log.error("MSG91 call failed: {}", e.getMessage());
-            throw new RuntimeException("Failed to send OTP. Please try again.");
+            throw AppException.badRequest("Failed to send OTP. Please try again.");
         }
     }
 
@@ -111,11 +112,11 @@ public class OtpService {
 
         Long count = redisTemplate.opsForValue().increment(key);
         if(count==1) {
-            redisTemplate.expire(key, Duration.ofMinutes(1));
+            redisTemplate.expire(key, Duration.ofMinutes(10));
         }
 
         if (count != null && count > 5) {
-            throw new RuntimeException("Too many OTP requests. Please try after 10 minutes.");
+            throw AppException.tooManyRequests("Too many OTP requests. Please try after 10 minutes.");
         }
     }
 
@@ -124,7 +125,7 @@ public class OtpService {
         String val = redisTemplate.opsForValue().get(key);
         int attempts = val == null ? 0 : Integer.parseInt(val);
         if (attempts > 10) {
-            throw new RuntimeException("Too many wrong attempts. Try again later.");
+            throw AppException.tooManyRequests("Too many wrong attempts. Try again later.");
         }
     }
 }

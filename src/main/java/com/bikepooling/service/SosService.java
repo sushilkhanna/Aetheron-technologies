@@ -13,6 +13,7 @@ import com.bikepooling.exception.AppException;
 import com.bikepooling.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,9 @@ import java.util.stream.Collectors;
 public class SosService {
 
     private static final int EXPIRY_INACTIVITY_MINUTES = 30;
+
+    @Value("${sos.tracking.base-url:https://bikepooling.in/sos/track}")
+    private String trackingBaseUrl;
 
     private final SosRepository sosRepository;
     private final SosLocationPingRepository sosLocationPingRepository;
@@ -344,7 +348,8 @@ public class SosService {
     }
 
     private String buildTrackingLink(String trackingToken) {
-        return "https://yourapp.example.com/sos/track/" + trackingToken;
+        String base = trackingBaseUrl.endsWith("/") ? trackingBaseUrl.substring(0, trackingBaseUrl.length() - 1) : trackingBaseUrl;
+        return base + "/" + trackingToken;
     }
 
     private String buildSosMessage(User user, ScheduledRideInstance instance, BigDecimal lat, BigDecimal lng, String trackingLink) {

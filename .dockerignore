@@ -1,0 +1,17 @@
+.git/
+.gitignore
+.idea/
+*.iml
+*.iws
+*.ipr
+target/
+*.md
+.vscode/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+blablabike-main/
+firebase-service-account.json
+docker-compose*.yml

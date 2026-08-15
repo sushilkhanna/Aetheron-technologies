@@ -3,10 +3,12 @@ package com.bikepooling.repository;
 import com.bikepooling.entity.ScheduledRideInstance;
 import com.bikepooling.enums.RideState;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -27,6 +29,7 @@ public interface ScheduledRideInstanceRepository extends JpaRepository<Scheduled
         """)
     Optional<ScheduledRideInstance> findByIdWithDetails(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT i FROM ScheduledRideInstance i
         JOIN FETCH i.template t
@@ -200,4 +203,7 @@ public interface ScheduledRideInstanceRepository extends JpaRepository<Scheduled
         WHERE i.state IN (com.bikepooling.enums.RideState.STARTED, com.bikepooling.enums.RideState.VERIFIED, com.bikepooling.enums.RideState.SOS_TRIGGERED)
         """)
     List<ScheduledRideInstance> findAllActiveInstances();
+
+    @Query("SELECT COUNT(i) FROM ScheduledRideInstance i WHERE i.state IN :states")
+    long countByStateIn(@Param("states") List<RideState> states);
 }

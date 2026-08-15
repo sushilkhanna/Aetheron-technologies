@@ -15,6 +15,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import java.util.List;
 
 @Configuration
@@ -26,6 +28,9 @@ public class SecurityConfig {
     private final JwtAuthFilter   jwtAuthFilter;
     private final RateLimitFilter rateLimitFilter;
 
+    @Value("${springdoc.swagger-ui.enabled:true}")
+    private boolean swaggerEnabled;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -34,13 +39,11 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // ── Fix: propagate security context into async SSE scheduler threads ──
-                // Without this, Tomcat's async re-dispatch loses the SecurityContext
-                // and throws AuthorizationDeniedException on SSE disconnect events.
+
                 .securityContext(ctx -> ctx.requireExplicitSave(false))
 
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
+                .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/verify-registration-otp",
                                 "/api/auth/login/send-otp",
@@ -53,15 +56,21 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers(
+                                "/ws/**",
+                                "/api/public/**"
+                        ).permitAll();
+
+                    // Only permit Swagger/API-docs in non-prod (when swagger is enabled)
+                    if (swaggerEnabled) {
+                        auth.requestMatchers(
                                 "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/ws/**"
-                        ).permitAll()
+                                "/v3/api-docs/**"
+                        ).permitAll();
+                    }
 
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-
-                        .anyRequest().authenticated()
-                )
+                    auth.requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated();
+                })
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, RateLimitFilter.class);
 
@@ -79,8 +88,10 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(List.of(
                 "http://localhost:[*]",
                 "http://127.0.0.1:[*]",
-                "https://*.blablabike.com",
-                "https://*.example.com"
+                "https://bikepooling.in",
+                "https://www.bikepooling.in",
+                "https://bikepooling.com",
+                "https://www.bikepooling.com"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "authkey"));

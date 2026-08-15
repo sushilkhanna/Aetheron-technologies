@@ -90,12 +90,25 @@ public class RateLimitFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
+    // Lua script: atomically increment and set TTL on first creation.
+    // Prevents TOCTOU bug where crash between INCR and EXPIRE leaves key without TTL.
+    private static final String RATE_LIMIT_LUA =
+            "local count = redis.call('INCR', KEYS[1]) " +
+            "if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end " +
+            "return count";
+
     private boolean isRateLimited(String key, int limit,
                                   Duration window,
                                   HttpServletResponse response) throws IOException {
-        Long count = redisTemplate.opsForValue().increment(key);
-        if (count == 1) {
-            redisTemplate.expire(key, window);
+        Long count;
+        try {
+            count = redisTemplate.execute(
+                    org.springframework.data.redis.core.script.RedisScript.of(RATE_LIMIT_LUA, Long.class),
+                    java.util.List.of(key),
+                    String.valueOf(window.getSeconds()));
+        } catch (Exception e) {
+            log.warn("Redis rate-limit check failed, allowing request: {}", e.getMessage());
+            return false; // Fail-open: allow request if Redis is down
         }
         if (count != null && count > limit) {
             response.setStatus(429);

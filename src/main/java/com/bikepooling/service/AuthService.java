@@ -4,6 +4,7 @@ import com.bikepooling.dto.request.*;
 import com.bikepooling.dto.response.AuthResponse;
 import com.bikepooling.entity.User;
 import com.bikepooling.enums.Role;
+import com.bikepooling.exception.AppException;
 import com.bikepooling.repository.UserRepository;
 import com.bikepooling.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,7 @@ public class AuthService {
         req.phone = req.phone.trim();
         req.fullName = req.fullName.trim();
         if (userRepository.existsByPhone(req.phone)) {
-            throw new RuntimeException("Phone number is already registered.");
+            throw AppException.conflict("Phone number is already registered.");
         }
         redisTemplate.opsForValue().set(
                 PRE_REGISTER_PREFIX + req.phone,
@@ -49,18 +50,18 @@ public class AuthService {
 
         boolean valid = otpService.verifyOtp(req.phone, req.otp);
         if (!valid) {
-            throw new RuntimeException("Invalid or expired OTP. Please request a new one.");
+            throw AppException.badRequest("Invalid or expired OTP. Please request a new one.");
         }
 
         String key      = PRE_REGISTER_PREFIX + req.phone;
         String fullName = redisTemplate.opsForValue().get(key);
 
         if (fullName == null) {
-            throw new RuntimeException("Registration session expired. Please register again.");
+            throw AppException.badRequest("Registration session expired. Please register again.");
         }
 
         if (userRepository.existsByPhone(req.phone)) {
-            throw new RuntimeException("Phone already registered. Please login instead.");
+            throw AppException.conflict("Phone already registered. Please login instead.");
         }
 
         User user = User.builder()
@@ -80,7 +81,7 @@ public class AuthService {
 
     public void sendLoginOtp(SendOtpRequest req) {
         User user = userRepository.findByPhone(req.phone)
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> AppException.notFound(
                         "No account found with this phone number."));
 
         checkAccountActive(user);
@@ -89,14 +90,14 @@ public class AuthService {
 
     public AuthResponse loginWithOtp(VerifyOtpRequest req) {
         User user = userRepository.findByPhone(req.phone)
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> AppException.notFound(
                         "No account found with this phone number."));
 
         checkAccountActive(user);
 
         boolean valid = otpService.verifyOtp(req.phone, req.otp);
         if (!valid) {
-            throw new RuntimeException(
+            throw AppException.badRequest(
                     "Invalid or expired OTP. Please request a new one.");
         }
 
@@ -105,13 +106,13 @@ public class AuthService {
 
     public void sendAdminLoginOtp(SendOtpRequest req) {
         User user = userRepository.findByPhone(req.phone)
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> AppException.notFound(
                         "No account found with this phone number."));
 
         // Reject non-admins BEFORE sending the OTP
         if (user.getRole() != Role.ADMIN) {
             log.warn("Admin OTP requested for non-admin phone: {}", req.phone);
-            throw new RuntimeException("No account found with this phone number.");
+            throw AppException.notFound("No account found with this phone number.");
         }
 
         checkAccountActive(user);
@@ -121,19 +122,19 @@ public class AuthService {
 
     public AuthResponse adminLoginWithOtp(VerifyOtpRequest req) {
         User user = userRepository.findByPhone(req.phone)
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> AppException.notFound(
                         "No account found with this phone number."));
 
         checkAccountActive(user);
 
         boolean valid = otpService.verifyOtp(req.phone, req.otp);
         if (!valid) {
-            throw new RuntimeException("Invalid or expired OTP. Please request a new one.");
+            throw AppException.badRequest("Invalid or expired OTP. Please request a new one.");
         }
 
         if (user.getRole() != Role.ADMIN) {
             log.warn("Admin login attempted by non-admin after OTP verify: {}", req.phone);
-            throw new RuntimeException("Access denied.");
+            throw AppException.forbidden("Access denied.");
         }
 
         log.info("Admin logged in: {}", req.phone);
@@ -142,7 +143,7 @@ public class AuthService {
 
     private void checkAccountActive(User user) {
         if (!user.isActive()) {
-            throw new RuntimeException("Your account has been deactivated. Contact support.");
+            throw AppException.forbidden("Your account has been deactivated. Contact support.");
         }
     }
 
