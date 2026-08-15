@@ -62,6 +62,7 @@ const Home = () => {
       />
       <FeaturesSection />
       <HowItWorks />
+      <SeoFaqSection />
       <CTASection onOpenDownloadModal={handleOpenModal} />
       <ComingSoonModal 
         isOpen={modalOpen} 
@@ -114,18 +115,18 @@ const HeroSection = ({ bgIndex, setBgIndex, onOpenDownloadModal }) => (
                   Official
                 </span>
               </div>
-              <span className="text-xs text-gray-300 font-medium">Smart 2-Wheeler Ride Sharing Platform</span>
+              <span className="text-xs text-gray-300 font-medium">India's #1 Bike Pooling & Ride Sharing App</span>
             </div>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black leading-tight mb-6 fade-up-2">
-            <span className="text-white">Got a spare seat?</span><br />
-            <span className="gradient-text">Share your ride.</span><br />
-            <span className="text-white">Split the cost.</span>
+            <span className="text-white">Smart 2-Wheeler</span><br />
+            <span className="gradient-text">Bike Pooling.</span><br />
+            <span className="text-white">Share Ride & Save.</span>
           </h1>
 
           <p className="text-base sm:text-lg text-gray-300 mb-8 leading-relaxed max-w-lg fade-up-3">
-            Post your daily 2-wheeler commute and let someone going the same way join you. Save fuel costs, reduce traffic, and travel safely.
+            Join India's largest <strong>Bike Pooling</strong> platform. Share your daily bike commute with verified commuters, split fuel costs, reduce traffic, and ride safely every day.
           </p>
 
           {/* Authentic Trust Commitments Grid (Replaces old stat counters) */}
@@ -319,6 +320,54 @@ const FeaturesSection = () => (
             </div>
             <h3 className="text-xl font-bold text-white mb-4">{feature.title}</h3>
             <p className="text-gray-300 leading-relaxed">{feature.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+const SeoFaqSection = () => (
+  <section className="py-20 bg-slate-950 text-gray-200 border-t border-b border-white/10">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="text-center mb-12">
+        <span className="text-xs font-bold uppercase tracking-widest text-orange-400 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
+          Frequently Asked Questions
+        </span>
+        <h2 className="text-3xl sm:text-4xl font-black text-white mt-4">
+          Everything You Need to Know About <span className="gradient-text">Bike Pooling</span>
+        </h2>
+        <p className="text-gray-400 mt-2 max-w-2xl mx-auto text-sm sm:text-base">
+          Learn how India's leading 2-wheeler bike ride sharing & bike pool platform simplifies daily office commutes.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {[
+          {
+            q: "What is Bike Pooling?",
+            a: "Bike Pooling is a smart 2-wheeler ride-sharing concept where bike riders with a vacant rear seat share their commute with pillion riders heading in the same direction. It helps both riders split fuel costs and reduces city traffic."
+          },
+          {
+            q: "How does the Bike Pooling App work?",
+            a: "The Bike Pooling mobile app matches verified bike owners with daily commuters traveling along similar routes. Riders post their route, pillion passengers search and request a ride, and both split fuel expenses seamlessly."
+          },
+          {
+            q: "Is 2-Wheeler Bike Ride Sharing legal in India?",
+            a: "Yes! Peer-to-peer fuel cost sharing on non-commercial 2-wheelers (motorcycles & scooters) is compliant with Indian Motor Vehicles Act guidelines as long as it operates on a cost-sharing basis without commercial taxi profit markup."
+          },
+          {
+            q: "How safe is Bike Pooling for women and daily commuters?",
+            a: "Bike Pooling prioritizes user safety with mandatory Govt API-verified KYC (Aadhaar & Driving Licence), live GPS route tracking, emergency SOS alerts, and verified rating systems for all riders."
+          }
+        ].map((faq, i) => (
+          <div key={i} className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-orange-500/30 transition-all">
+            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <span className="text-orange-400 font-extrabold text-xl">Q.</span> {faq.q}
+            </h3>
+            <p className="text-gray-300 text-sm leading-relaxed pl-6">
+              {faq.a}
+            </p>
           </div>
         ))}
       </div>

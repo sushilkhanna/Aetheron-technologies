@@ -103,12 +103,12 @@ const About = () => {
                 <Heart size={28} />
               </div>
               <div>
-                <h1 className="text-3xl sm:text-4xl font-black text-white">About BikePooling</h1>
-                <p className="text-sm text-gray-400 mt-1">Our Story · Mission · Values</p>
+                <h1 className="text-3xl sm:text-4xl font-black text-white">About Bike Pooling (BikePooling)</h1>
+                <p className="text-sm text-gray-400 mt-1">India's Premier 2-Wheeler Bike Ride Sharing Community</p>
               </div>
             </div>
             <p className="text-gray-300 text-base sm:text-lg leading-relaxed max-w-3xl relative z-10">
-              We're building India's most trusted 2-wheeler ride-sharing community — connecting everyday commuters who share the same route, so everyone saves fuel, cuts traffic, and rides safer together.
+              We are building India's most trusted <strong>Bike Pooling</strong> & 2-wheeler ride-sharing platform — connecting everyday commuters who share the same route, so everyone saves fuel, cuts traffic, and rides safer together.
             </p>
           </div>
         </FadeInSection>
