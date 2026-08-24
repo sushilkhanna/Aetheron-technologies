@@ -61,6 +61,7 @@ const Home = () => {
         onOpenDownloadModal={handleOpenModal} 
       />
       <FeaturesSection />
+      <BikepoolingKeywordSection />
       <HowItWorks />
       <SeoFaqSection />
       <CTASection onOpenDownloadModal={handleOpenModal} />
@@ -94,29 +95,16 @@ const HeroSection = ({ bgIndex, setBgIndex, onOpenDownloadModal }) => (
     <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 pb-20 w-full">
       <div className="grid lg:grid-cols-2 gap-12 items-center">
         <div>
-          {/* Top Heading Branding with Video Logo */}
+          {/* Top Heading Branding with Transparent Official Logo Image */}
           <div className="flex items-center gap-3.5 mb-6 fade-up-1">
-            <div className="w-14 h-14 rounded-2xl overflow-hidden p-0.5 bg-gradient-to-tr from-orange-500 via-amber-400 to-orange-600 shadow-xl shadow-orange-500/30 border border-orange-400/40 transform hover:scale-105 transition-transform duration-300">
-              <video
-                src="/bikepooling.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full h-full object-cover rounded-[14px]"
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                  Bike<span className="gradient-text">Pool</span>ing
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[10px] font-bold uppercase tracking-wider">
-                  Official
-                </span>
-              </div>
-              <span className="text-xs text-gray-300 font-medium">India's #1 Bike Pooling & Ride Sharing App</span>
-            </div>
+            <img
+              src="/logo.png"
+              alt="Bike Pooling - bikepooling.in"
+              className="h-11 sm:h-13 w-auto object-contain drop-shadow-[0_4px_20px_rgba(255,112,0,0.35)]"
+            />
+            <span className="px-2.5 py-1 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-[11px] font-bold uppercase tracking-wider">
+              Official Platform
+            </span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black leading-tight mb-6 fade-up-2">
@@ -327,6 +315,73 @@ const FeaturesSection = () => (
   </section>
 );
 
+const BikepoolingKeywordSection = () => (
+  <section className="py-20 bg-slate-900/60 border-t border-b border-white/10 text-gray-200">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="text-center max-w-3xl mx-auto mb-16">
+        <span className="text-xs font-bold uppercase tracking-widest text-orange-400 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">
+          Understanding Bike Pooling
+        </span>
+        <h2 className="text-3xl sm:text-5xl font-black text-white mt-4 leading-tight">
+          What is <span className="gradient-text">Bikepooling Meaning</span> & How It Beats Commercial Taxis
+        </h2>
+        <p className="text-gray-300 mt-4 text-base sm:text-lg leading-relaxed">
+          Discover why daily commuters across India are switching from expensive commercial rides like <strong>Rapido</strong>, <strong>Uber Moto</strong>, and <strong>Ola Bike</strong> to smart, peer-to-peer <strong>Bike Pooling</strong> on <strong>BikePooling.in</strong>.
+        </p>
+      </div>
+
+      {/* Grid Cards: Bikepooling Meaning vs Rapido/Uber/Ola */}
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="p-8 rounded-3xl bg-slate-950/80 border border-orange-500/20 hover:border-orange-500/50 transition-all shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 font-black text-xl mb-6">
+            01
+          </div>
+          <h3 className="text-xl font-bold text-white mb-3">
+            Bikepooling & Bikepool Meaning
+          </h3>
+          <p className="text-gray-300 text-sm leading-relaxed mb-4">
+            <strong>Bikepooling meaning</strong> defines a true 2-wheeler ride-sharing system where bike owners traveling on a fixed daily route offer their empty rear seat to co-commuters heading the same way.
+          </p>
+          <p className="text-gray-400 text-xs leading-relaxed">
+            By sharing the actual fuel expense, a <strong>bikepool</strong> lowers commuting costs by up to 70% while reducing traffic congestion and vehicle emissions.
+          </p>
+        </div>
+
+        <div className="p-8 rounded-3xl bg-slate-950/80 border border-amber-500/20 hover:border-amber-500/50 transition-all shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xl mb-6">
+            02
+          </div>
+          <h3 className="text-xl font-bold text-white mb-3">
+            Alternative to Rapido, Uber & Ola
+          </h3>
+          <p className="text-gray-300 text-sm leading-relaxed mb-4">
+            Unlike commercial ride-hailing apps like <strong>Rapido</strong>, <strong>Uber Moto</strong>, or <strong>Ola Bike</strong> that charge commercial fares, high commission fees, and surge pricing during peak hours:
+          </p>
+          <p className="text-gray-400 text-xs leading-relaxed">
+            <strong>BikePooling.in</strong> is a genuine non-commercial community where riders split fuel costs transparently with zero surge markups.
+          </p>
+        </div>
+
+        <div className="p-8 rounded-3xl bg-slate-950/80 border border-orange-500/20 hover:border-orange-500/50 transition-all shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 font-black text-xl mb-6">
+            03
+          </div>
+          <h3 className="text-xl font-bold text-white mb-3">
+            Safe, Govt KYC Verified Rides
+          </h3>
+          <p className="text-gray-300 text-sm leading-relaxed mb-4">
+            Safety is built into every <strong>bike ride</strong>. All riders on BikePooling.in undergo instant government API validation for Aadhaar and Driving Licence (DL).
+          </p>
+          <p className="text-gray-400 text-xs leading-relaxed">
+            Enjoy live GPS route tracking, emergency SOS alerts, and verified ratings for complete peace of mind on every trip.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
 const SeoFaqSection = () => (
   <section className="py-20 bg-slate-950 text-gray-200 border-t border-b border-white/10">
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -335,7 +390,7 @@ const SeoFaqSection = () => (
           Frequently Asked Questions
         </span>
         <h2 className="text-3xl sm:text-4xl font-black text-white mt-4">
-          Everything You Need to Know About <span className="gradient-text">Bike Pooling</span>
+          Everything You Need to Know About <span className="gradient-text">Bike Pooling & Rides</span>
         </h2>
         <p className="text-gray-400 mt-2 max-w-2xl mx-auto text-sm sm:text-base">
           Learn how India's leading 2-wheeler bike ride sharing & bike pool platform simplifies daily office commutes.
@@ -345,20 +400,28 @@ const SeoFaqSection = () => (
       <div className="grid md:grid-cols-2 gap-6">
         {[
           {
-            q: "What is Bike Pooling?",
-            a: "Bike Pooling is a smart 2-wheeler ride-sharing concept where bike riders with a vacant rear seat share their commute with pillion riders heading in the same direction. It helps both riders split fuel costs and reduces city traffic."
+            q: "What is Bikepooling meaning & Bikepool concept?",
+            a: "Bikepooling meaning refers to sharing a motorcycle or scooter ride between daily commuters traveling on the same route. Rather than taking individual vehicles or expensive taxis, bike pooling allows a bike owner to offer their vacant rear seat to a pillion rider to split fuel expenses."
           },
           {
-            q: "How does the Bike Pooling App work?",
-            a: "The Bike Pooling mobile app matches verified bike owners with daily commuters traveling along similar routes. Riders post their route, pillion passengers search and request a ride, and both split fuel expenses seamlessly."
+            q: "How is Bike Pooling different from Rapido, Uber Moto, or Ola Bike?",
+            a: "While Rapido, Uber Moto, and Ola Bike operate as commercial bike taxi services with surge prices and driver commissions, BikePooling.in is a non-commercial peer-to-peer ride-sharing platform for daily office and college commuters to split actual fuel expenses without extra surge charges."
+          },
+          {
+            q: "How do I offer or request a bike ride on BikePooling.in?",
+            a: "Simply download the BikePooling app or visit bikepooling.in. Enter your starting location and destination to instantly match with verified commuters heading along your route."
           },
           {
             q: "Is 2-Wheeler Bike Ride Sharing legal in India?",
-            a: "Yes! Peer-to-peer fuel cost sharing on non-commercial 2-wheelers (motorcycles & scooters) is compliant with Indian Motor Vehicles Act guidelines as long as it operates on a cost-sharing basis without commercial taxi profit markup."
+            a: "Yes! Peer-to-peer fuel cost sharing on non-commercial 2-wheelers (motorcycles & scooters) is compliant with Indian Motor Vehicles Act guidelines as long as it operates on a non-profit cost-sharing basis."
           },
           {
-            q: "How safe is Bike Pooling for women and daily commuters?",
-            a: "Bike Pooling prioritizes user safety with mandatory Govt API-verified KYC (Aadhaar & Driving Licence), live GPS route tracking, emergency SOS alerts, and verified rating systems for all riders."
+            q: "How safe is Bike Pooling for daily commuters and women?",
+            a: "BikePooling prioritizes safety with mandatory Govt API-verified KYC (Aadhaar & Driving Licence), live GPS route tracking, emergency SOS button, and verified rating systems for all riders."
+          },
+          {
+            q: "Why is Bike Pooling better than solo riding or commercial ride apps?",
+            a: "Bike pooling saves up to 70% on monthly fuel expenses, avoids heavy traffic delays by navigating peak hours easily on a 2-wheeler, and reduces urban carbon footprint compared to solo riding or hailing commercial cabs."
           }
         ].map((faq, i) => (
           <div key={i} className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-orange-500/30 transition-all">

@@ -25,22 +25,12 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-orange-500 to-amber-400 shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform duration-200">
-              <video
-                src="/bikepooling.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full h-full object-cover rounded-[10px]"
-              />
-            </div>
-            <span className="text-xl font-bold tracking-tight">
-              <span className="text-white">Bike</span>
-              <span className="gradient-text">Pool</span>
-              <span className="text-white">ing</span>
-            </span>
+          <Link to="/" className="flex items-center gap-2 group">
+            <img
+              src="/logo.png"
+              alt="BikePooling - bikepooling.in"
+              className="h-10 sm:h-11 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
+            />
           </Link>
 
           {/* Right side - Menu and Admin Login */}

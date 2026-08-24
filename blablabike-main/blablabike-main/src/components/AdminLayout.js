@@ -57,13 +57,14 @@ const AdminLayout = ({ children }) => {
               <Menu size={20} />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <Activity size={24} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">BikePooling</h1>
-                <p className="text-sm text-orange-400">Admin Panel</p>
-              </div>
+              <img
+                src="/logo.png"
+                alt="BikePooling - bikepooling.in"
+                className="h-9 w-auto object-contain"
+              />
+              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold border border-orange-500/30">
+                Admin Panel
+              </span>
             </div>
           </div>
 

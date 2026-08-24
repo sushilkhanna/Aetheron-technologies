@@ -121,19 +121,14 @@ const ComingSoonModal = ({ isOpen, onClose, platform = 'app', launchTargetDateTi
           <X size={20} />
         </button>
 
-        {/* Video Logo Preview Header */}
+        {/* Logo Preview Header */}
         <div className="flex flex-col items-center text-center">
           <div className="relative mb-4">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden p-0.5 bg-gradient-to-tr from-orange-500 via-amber-400 to-orange-600 shadow-xl shadow-orange-500/30">
-              <video
-                src="/bikepooling.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full h-full object-cover rounded-[14px]"
-              />
-            </div>
+            <img
+              src="/logo.png"
+              alt="BikePooling - bikepooling.in"
+              className="h-14 sm:h-16 w-auto object-contain"
+            />
             <div className="absolute -bottom-2 -right-2 bg-orange-500 text-white text-xs px-2.5 py-0.5 rounded-full font-bold shadow-md flex items-center gap-1 border border-black/40">
               <Sparkles size={12} />
               <span>Soon</span>

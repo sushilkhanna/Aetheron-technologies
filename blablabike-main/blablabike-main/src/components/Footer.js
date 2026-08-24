@@ -28,22 +28,12 @@ const Footer = () => (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="grid md:grid-cols-4 gap-8 mb-10">
         <div className="md:col-span-2">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-tr from-orange-500 to-amber-400 shadow-md shadow-orange-500/20">
-              <video
-                src="/bikepooling.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full h-full object-cover rounded-[10px]"
-              />
-            </div>
-            <span className="text-xl font-bold">
-              <span className="text-white">Bike</span>
-              <span className="gradient-text">Pool</span>
-              <span className="text-white">ing</span>
-            </span>
+          <div className="flex items-center mb-3">
+            <img
+              src="/logo.png"
+              alt="BikePooling - bikepooling.in"
+              className="h-10 sm:h-12 w-auto object-contain"
+            />
           </div>
           <p className="text-gray-500 text-sm leading-relaxed max-w-xs">
             India's smartest 2-wheeler ride-sharing platform. Share your commute, split the cost, save the planet.

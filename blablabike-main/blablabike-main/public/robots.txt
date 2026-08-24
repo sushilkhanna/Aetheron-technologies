@@ -2,10 +2,14 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 
+Sitemap: https://bikepooling.in/sitemap.xml
 Sitemap: https://bikepooling.com/sitemap.xml
 
-# Google
+# Google Crawlers & Favicon Indexer
 User-agent: Googlebot
+Allow: /
+
+User-agent: Google-Favicon
 Allow: /
 
 # Bing
@@ -33,3 +37,4 @@ Allow: /
 
 User-agent: Bytespider
 Allow: /
+

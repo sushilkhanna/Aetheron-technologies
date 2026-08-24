@@ -95,20 +95,19 @@ const About = () => {
             <div className="absolute -top-16 -right-16 w-48 h-48 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-20 -left-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="flex items-center gap-4 mb-5 relative z-10">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-500/30"
-                style={{ background: 'linear-gradient(135deg, #FF7000, #ff9a3c)' }}
-              >
-                <Heart size={28} />
-              </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-5 relative z-10">
+              <img
+                src="/logo.png"
+                alt="Bike Pooling - bikepooling.in"
+                className="h-12 sm:h-14 w-auto object-contain drop-shadow-lg"
+              />
               <div>
-                <h1 className="text-3xl sm:text-4xl font-black text-white">About Bike Pooling (BikePooling)</h1>
-                <p className="text-sm text-gray-400 mt-1">India's Premier 2-Wheeler Bike Ride Sharing Community</p>
+                <h1 className="text-2xl sm:text-3xl font-black text-white">About BikePooling.in</h1>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">India's Premier 2-Wheeler Bike Ride Sharing Community | Alternative to Rapido, Uber & Ola</p>
               </div>
             </div>
             <p className="text-gray-300 text-base sm:text-lg leading-relaxed max-w-3xl relative z-10">
-              We are building India's most trusted <strong>Bike Pooling</strong> & 2-wheeler ride-sharing platform — connecting everyday commuters who share the same route, so everyone saves fuel, cuts traffic, and rides safer together.
+              We are building India's most trusted <strong>Bike Pooling</strong> & 2-wheeler ride sharing platform (<strong>BikePooling.in</strong>) — connecting daily office & college commuters sharing the same route. Save fuel costs, beat traffic, and ride safely together.
             </p>
           </div>
         </FadeInSection>
