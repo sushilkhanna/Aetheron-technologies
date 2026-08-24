@@ -103,7 +103,7 @@ const About = () => {
               />
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-white">About BikePooling.in</h1>
-                <p className="text-xs sm:text-sm text-gray-400 mt-1">India's Premier 2-Wheeler Bike Ride Sharing Community | Alternative to Rapido, Uber & Ola</p>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">Smart 2-Wheeler Bike Ride Sharing Community</p>
               </div>
             </div>
             <p className="text-gray-300 text-base sm:text-lg leading-relaxed max-w-3xl relative z-10">

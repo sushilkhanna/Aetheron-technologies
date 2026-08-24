@@ -114,7 +114,7 @@ const HeroSection = ({ bgIndex, setBgIndex, onOpenDownloadModal }) => (
           </h1>
 
           <p className="text-base sm:text-lg text-gray-300 mb-8 leading-relaxed max-w-lg fade-up-3">
-            Join India's largest <strong>Bike Pooling</strong> platform. Share your daily bike commute with verified commuters, split fuel costs, reduce traffic, and ride safely every day.
+            Join the smart 2-wheeler <strong>Bike Pooling</strong> platform. Share your daily bike commute with verified commuters, split fuel costs, reduce traffic, and ride safely every day.
           </p>
 
           {/* Authentic Trust Commitments Grid (Replaces old stat counters) */}
@@ -324,14 +324,14 @@ const BikepoolingKeywordSection = () => (
           Understanding Bike Pooling
         </span>
         <h2 className="text-3xl sm:text-5xl font-black text-white mt-4 leading-tight">
-          What is <span className="gradient-text">Bikepooling Meaning</span> & How It Beats Commercial Taxis
+          What is <span className="gradient-text">Bikepooling Meaning</span> & How It Works
         </h2>
         <p className="text-gray-300 mt-4 text-base sm:text-lg leading-relaxed">
-          Discover why daily commuters across India are switching from expensive commercial rides like <strong>Rapido</strong>, <strong>Uber Moto</strong>, and <strong>Ola Bike</strong> to smart, peer-to-peer <strong>Bike Pooling</strong> on <strong>BikePooling.in</strong>.
+          Discover why daily commuters across India use smart, peer-to-peer <strong>Bike Pooling</strong> on <strong>BikePooling.in</strong> to share rides and split fuel costs cleanly.
         </p>
       </div>
 
-      {/* Grid Cards: Bikepooling Meaning vs Rapido/Uber/Ola */}
+      {/* Grid Cards: Bikepooling Meaning */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="p-8 rounded-3xl bg-slate-950/80 border border-orange-500/20 hover:border-orange-500/50 transition-all shadow-xl">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400 font-black text-xl mb-6">
@@ -353,10 +353,10 @@ const BikepoolingKeywordSection = () => (
             02
           </div>
           <h3 className="text-xl font-bold text-white mb-3">
-            Alternative to Rapido, Uber & Ola
+            Non-Commercial Cost Sharing
           </h3>
           <p className="text-gray-300 text-sm leading-relaxed mb-4">
-            Unlike commercial ride-hailing apps like <strong>Rapido</strong>, <strong>Uber Moto</strong>, or <strong>Ola Bike</strong> that charge commercial fares, high commission fees, and surge pricing during peak hours:
+            Unlike commercial ride-hailing taxis that charge heavy fares, commissions, and peak hour surge pricing:
           </p>
           <p className="text-gray-400 text-xs leading-relaxed">
             <strong>BikePooling.in</strong> is a genuine non-commercial community where riders split fuel costs transparently with zero surge markups.
@@ -393,7 +393,7 @@ const SeoFaqSection = () => (
           Everything You Need to Know About <span className="gradient-text">Bike Pooling & Rides</span>
         </h2>
         <p className="text-gray-400 mt-2 max-w-2xl mx-auto text-sm sm:text-base">
-          Learn how India's leading 2-wheeler bike ride sharing & bike pool platform simplifies daily office commutes.
+          Learn how 2-wheeler bike ride sharing & bike pool platform simplifies daily office commutes.
         </p>
       </div>
 
@@ -404,8 +404,8 @@ const SeoFaqSection = () => (
             a: "Bikepooling meaning refers to sharing a motorcycle or scooter ride between daily commuters traveling on the same route. Rather than taking individual vehicles or expensive taxis, bike pooling allows a bike owner to offer their vacant rear seat to a pillion rider to split fuel expenses."
           },
           {
-            q: "How is Bike Pooling different from Rapido, Uber Moto, or Ola Bike?",
-            a: "While Rapido, Uber Moto, and Ola Bike operate as commercial bike taxi services with surge prices and driver commissions, BikePooling.in is a non-commercial peer-to-peer ride-sharing platform for daily office and college commuters to split actual fuel expenses without extra surge charges."
+            q: "How is Bike Pooling different from commercial ride taxis?",
+            a: "While commercial ride services operate as taxi businesses with surge pricing and driver commissions, BikePooling.in is a non-commercial peer-to-peer ride-sharing platform for daily office and college commuters to split actual fuel expenses without extra surge charges."
           },
           {
             q: "How do I offer or request a bike ride on BikePooling.in?",
@@ -420,8 +420,8 @@ const SeoFaqSection = () => (
             a: "BikePooling prioritizes safety with mandatory Govt API-verified KYC (Aadhaar & Driving Licence), live GPS route tracking, emergency SOS button, and verified rating systems for all riders."
           },
           {
-            q: "Why is Bike Pooling better than solo riding or commercial ride apps?",
-            a: "Bike pooling saves up to 70% on monthly fuel expenses, avoids heavy traffic delays by navigating peak hours easily on a 2-wheeler, and reduces urban carbon footprint compared to solo riding or hailing commercial cabs."
+            q: "Why is Bike Pooling better than solo riding?",
+            a: "Bike pooling saves up to 70% on monthly fuel expenses, avoids heavy traffic delays by navigating peak hours easily on a 2-wheeler, and reduces urban carbon footprint compared to solo commuting."
           }
         ].map((faq, i) => (
           <div key={i} className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-orange-500/30 transition-all">
