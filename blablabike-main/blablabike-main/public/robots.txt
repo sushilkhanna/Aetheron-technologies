@@ -3,7 +3,8 @@ Allow: /
 Disallow: /admin/
 
 Sitemap: https://bikepooling.in/sitemap.xml
-Sitemap: https://bikepooling.com/sitemap.xml
+Sitemap: https://bikepooling.in/sitemap_index.xml
+Sitemap: https://bikepooling.com/sitemap-com.xml
 
 # Google Crawlers & Favicon Indexer
 User-agent: Googlebot
